@@ -1,38 +1,134 @@
-import { Search } from 'lucide-react';
-import { useState } from 'react';
+import { Search, CheckCircle2, XCircle, RotateCcw } from 'lucide-react';
+import { useState, useMemo } from 'react';
 
-const mockData = Array.from({ length: 10 }).map((_, i) => ({
-  id: 15 - i,
-  name: 'LED 1',
-  action: i % 3 === 0 ? 'Tắt' : 'Bật',
-  status: i === 1 || i === 4 ? 'Đang chờ' : (i % 3 === 0 ? 'Tắt' : 'Bật'),
-  time: `15/08/2026 22:11:${31 - i > 10 ? 31 - i : '0' + (31 - i)}`
-}));
+interface HistoryItem {
+  id: number;
+  name: string;
+  action: 'Bật' | 'Tắt';
+  status: 'Thành công' | 'Thất bại';
+  time: string;
+}
+
+const mockData: HistoryItem[] = [
+  { id: 20, name: 'LED 1', action: 'Bật', status: 'Thành công', time: '12/09/2026 21:46:12' },
+  { id: 19, name: 'LED 2', action: 'Tắt', status: 'Thành công', time: '12/09/2026 21:40:05' },
+  { id: 18, name: 'LED 3', action: 'Bật', status: 'Thất bại', time: '12/09/2026 21:35:48' },
+  { id: 17, name: 'LED 1', action: 'Tắt', status: 'Thành công', time: '12/09/2026 21:28:30' },
+  { id: 16, name: 'LED 2', action: 'Bật', status: 'Thất bại', time: '12/09/2026 21:15:19' },
+  { id: 15, name: 'LED 3', action: 'Tắt', status: 'Thành công', time: '12/09/2026 21:02:44' },
+  { id: 14, name: 'LED 1', action: 'Bật', status: 'Thành công', time: '12/09/2026 20:55:22' },
+  { id: 13, name: 'LED 2', action: 'Tắt', status: 'Thành công', time: '12/09/2026 20:41:10' },
+  { id: 12, name: 'LED 3', action: 'Bật', status: 'Thành công', time: '12/09/2026 20:30:00' },
+  { id: 11, name: 'LED 1', action: 'Tắt', status: 'Thất bại', time: '12/09/2026 20:12:35' },
+  { id: 10, name: 'LED 2', action: 'Bật', status: 'Thành công', time: '12/09/2026 19:58:14' },
+  { id: 9, name: 'LED 3', action: 'Tắt', status: 'Thành công', time: '12/09/2026 19:45:29' },
+  { id: 8, name: 'LED 1', action: 'Bật', status: 'Thành công', time: '12/09/2026 19:30:15' },
+  { id: 7, name: 'LED 2', action: 'Bật', status: 'Thất bại', time: '12/09/2026 19:15:50' },
+  { id: 6, name: 'LED 3', action: 'Bật', status: 'Thành công', time: '12/09/2026 19:00:02' },
+];
 
 export default function History() {
   const [searchTerm, setSearchTerm] = useState('');
+  const [deviceFilter, setDeviceFilter] = useState('ALL');
+  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [pageSize, setPageSize] = useState(10);
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // Filter data based on search term, device, and status
+  const filteredData = useMemo(() => {
+    return mockData.filter((item) => {
+      const matchDevice = deviceFilter === 'ALL' || item.name === deviceFilter;
+      const matchStatus = statusFilter === 'ALL' || item.status === statusFilter;
+      const term = searchTerm.trim().toLowerCase();
+      const matchSearch =
+        !term ||
+        item.time.toLowerCase().includes(term);
+
+      return matchDevice && matchStatus && matchSearch;
+    });
+  }, [searchTerm, deviceFilter, statusFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredData.length / pageSize));
+  const currentData = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredData.slice(start, start + pageSize);
+  }, [filteredData, currentPage, pageSize]);
+
+  // Handle page reset if current page exceeds total
+  const safePage = Math.min(currentPage, totalPages);
+
+  const resetFilters = () => {
+    setSearchTerm('');
+    setDeviceFilter('ALL');
+    setStatusFilter('ALL');
+    setCurrentPage(1);
+  };
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 flex flex-col h-full animate-in fade-in duration-500">
-      {/* Toolbar */}
-      <div className="p-6 border-b border-gray-100 flex items-center gap-6">
-        <div className="flex items-center gap-3">
-          <span className="text-sm font-medium text-gray-600">Tên thiết bị:</span>
-          <select className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[#2a1b4d]/20 font-medium text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors">
-            <option>LED 1</option>
-            <option>LED 2</option>
-            <option>LED 3</option>
-          </select>
-        </div>
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-          <input 
-            type="text" 
-            placeholder="Tìm kiếm" 
-            className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2a1b4d]/20 focus:border-[#2a1b4d] transition-all"
+      {/* Toolbar: Search on the left, Filters on the right (same row) */}
+      <div className="p-6 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        {/* Expanded search input on the left */}
+        <div className="relative flex-1 max-w-sm lg:max-w-md min-w-[200px]">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Tìm kiếm..."
+            className="w-full pl-10 pr-4 py-2 bg-gray-50/80 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#2a1b4d]/20 focus:border-[#2a1b4d] focus:bg-white transition-all text-gray-800 placeholder-gray-400"
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setCurrentPage(1);
+            }}
           />
+        </div>
+
+        {/* Filters and Reset button grouped on the right in one single row */}
+        <div className="flex items-center gap-3 shrink-0 flex-nowrap overflow-x-auto">
+          {/* Device Filter */}
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-sm font-medium text-gray-600 whitespace-nowrap">Tên thiết bị:</span>
+            <select
+              className="bg-gray-50/80 border border-gray-200 rounded-xl px-3 py-2 text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-[#2a1b4d]/20 focus:border-[#2a1b4d] transition-all"
+              value={deviceFilter}
+              onChange={(e) => {
+                setDeviceFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+            >
+              <option value="ALL">Tất cả</option>
+              <option value="LED 1">LED 1</option>
+              <option value="LED 2">LED 2</option>
+              <option value="LED 3">LED 3</option>
+            </select>
+          </div>
+
+          {/* Status Filter */}
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-sm font-medium text-gray-600 whitespace-nowrap">Trạng thái:</span>
+            <select
+              className="bg-gray-50/80 border border-gray-200 rounded-xl px-3 py-2 text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-[#2a1b4d]/20 focus:border-[#2a1b4d] transition-all"
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+            >
+              <option value="ALL">Tất cả</option>
+              <option value="Thành công">Thành công</option>
+              <option value="Thất bại">Thất bại</option>
+            </select>
+          </div>
+
+          {/* Reset Filters button - always visible on the same row */}
+          <button
+            onClick={resetFilters}
+            title="Đặt lại bộ lọc"
+            className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 bg-gray-100 hover:bg-gray-200/80 rounded-xl transition-all shrink-0 whitespace-nowrap cursor-pointer"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span>Đặt lại</span>
+          </button>
         </div>
       </div>
 
@@ -41,49 +137,117 @@ export default function History() {
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-[#2a1b4d] text-white">
-              <th className="py-4 px-6 font-medium rounded-tl-xl w-24">ID</th>
-              <th className="py-4 px-6 font-medium">Tên thiết bị</th>
-              <th className="py-4 px-6 font-medium">Hành động</th>
-              <th className="py-4 px-6 font-medium">Trạng thái</th>
-              <th className="py-4 px-6 font-medium rounded-tr-xl">Thời gian bật/ tắt</th>
+              <th className="py-4 px-6 font-semibold rounded-tl-xl w-24">ID</th>
+              <th className="py-4 px-6 font-semibold">Tên thiết bị</th>
+              <th className="py-4 px-6 font-semibold">Hành động</th>
+              <th className="py-4 px-6 font-semibold">Trạng thái</th>
+              <th className="py-4 px-6 font-semibold rounded-tr-xl">Thời gian thực hiện</th>
             </tr>
           </thead>
           <tbody>
-            {mockData.map((row, idx) => (
-              <tr key={row.id} className={`border-b border-gray-100 hover:bg-blue-50/50 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}>
-                <td className="py-4 px-6 text-gray-600">{row.id}</td>
-                <td className="py-4 px-6 text-gray-800 font-medium">{row.name}</td>
-                <td className="py-4 px-6 text-gray-800">{row.action}</td>
-                <td className="py-4 px-6">
-                   <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                     row.status === 'Bật' ? 'bg-green-100 text-green-700 border border-green-200' :
-                     row.status === 'Tắt' ? 'bg-red-100 text-red-700 border border-red-200' :
-                     'bg-yellow-100 text-yellow-700 border border-yellow-200'
-                   }`}>
-                     {row.status}
-                   </span>
+            {currentData.length > 0 ? (
+              currentData.map((row, idx) => (
+                <tr
+                  key={row.id}
+                  className={`border-b border-gray-100 hover:bg-purple-50/30 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'
+                    }`}
+                >
+                  <td className="py-4 px-6 text-gray-600 font-mono text-sm">{row.id}</td>
+                  <td className="py-4 px-6 text-gray-900 font-medium">{row.name}</td>
+                  <td className="py-4 px-6">
+                    <span
+                      className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold ${row.action === 'Bật'
+                          ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                          : 'bg-gray-100 text-gray-600 border border-gray-200'
+                        }`}
+                    >
+                      {row.action}
+                    </span>
+                  </td>
+                  <td className="py-4 px-6">
+                    <span
+                      className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${row.status === 'Thành công'
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                          : 'bg-rose-50 text-rose-700 border border-rose-200'
+                        }`}
+                    >
+                      {row.status === 'Thành công' ? (
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                      ) : (
+                        <XCircle className="w-3.5 h-3.5" />
+                      )}
+                      {row.status}
+                    </span>
+                  </td>
+                  <td className="py-4 px-6 text-gray-500 text-sm font-mono">{row.time}</td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={5} className="py-12 text-center text-gray-400">
+                  <div className="flex flex-col items-center justify-center gap-2">
+                    <Search className="w-8 h-8 text-gray-300" />
+                    <p className="text-sm font-medium">Không tìm thấy dữ liệu phù hợp</p>
+                    <button
+                      onClick={resetFilters}
+                      className="text-xs text-[#2a1b4d] underline font-medium mt-1"
+                    >
+                      Xóa bộ lọc
+                    </button>
+                  </div>
                 </td>
-                <td className="py-4 px-6 text-gray-500">{row.time}</td>
               </tr>
-            ))}
+            )}
           </tbody>
         </table>
       </div>
 
       {/* Pagination */}
-      <div className="p-4 border-t border-gray-100 flex items-center justify-end gap-4 text-sm text-gray-600">
-        <span>Rows per page: 
-            <select className="bg-transparent font-medium ml-1 focus:outline-none cursor-pointer">
-                <option>7</option>
-                <option>10</option>
+      <div className="p-4 border-t border-gray-100 flex items-center justify-between text-sm text-gray-600 px-6">
+        <div className="text-xs text-gray-500">
+          Hiển thị <span className="font-semibold text-gray-700">{filteredData.length > 0 ? (safePage - 1) * pageSize + 1 : 0}</span> đến{' '}
+          <span className="font-semibold text-gray-700">
+            {Math.min(safePage * pageSize, filteredData.length)}
+          </span>{' '}
+          trong <span className="font-semibold text-gray-700">{filteredData.length}</span> bản ghi
+        </div>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs">Số hàng:</span>
+            <select
+              value={pageSize}
+              onChange={(e) => {
+                setPageSize(Number(e.target.value));
+                setCurrentPage(1);
+              }}
+              className="bg-gray-50 border border-gray-200 rounded-lg px-2 py-1 text-xs font-medium cursor-pointer focus:outline-none"
+            >
+              <option value={5}>5</option>
+              <option value={10}>10</option>
+              <option value={15}>15</option>
             </select>
-        </span>
-        <span>1 of 10</span>
-        <div className="flex gap-1">
-          <button className="p-1 rounded hover:bg-gray-100 transition-colors">&lt;</button>
-          <button className="p-1 rounded hover:bg-gray-100 transition-colors">&gt;</button>
+          </div>
+          <span className="text-xs font-medium">
+            Trang {safePage} / {totalPages}
+          </span>
+          <div className="flex gap-1">
+            <button
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={safePage <= 1}
+              className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-xs"
+            >
+              &lt;
+            </button>
+            <button
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={safePage >= totalPages}
+              className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-xs"
+            >
+              &gt;
+            </button>
+          </div>
         </div>
       </div>
     </div>
-  )
+  );
 }

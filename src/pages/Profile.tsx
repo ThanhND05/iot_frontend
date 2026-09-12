@@ -44,7 +44,7 @@ export default function Profile() {
       {/* Links Cards */}
       <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-6 h-fit">
         {/* Github */}
-        <a href="#" className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all group flex flex-col justify-between h-48">
+        <a href="https://github.com/ThanhND05/iot_backend" className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all group flex flex-col justify-between h-48" target="_blank" rel="noopener noreferrer">
           <div>
             <div className="flex items-center gap-3 mb-4">
               <FaGithub className="w-8 h-8 text-gray-800 shrink-0" />
@@ -58,7 +58,7 @@ export default function Profile() {
         </a>
 
         {/* Figma */}
-        <a href="#" className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all group flex flex-col justify-between h-48">
+        <a href="https://www.figma.com/design/GeleNXABjWCLxidTSf8UJv/IoT-Device-Monitoring-Dashboard--Community-?node-id=6732-5549&t=xn6YcY6AEr1BEJ82-1" className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all group flex flex-col justify-between h-48" target="_blank" rel="noopener noreferrer">
           <div>
             <div className="flex items-center gap-3 mb-4">
               <FaFigma className="w-8 h-8 text-pink-500 shrink-0" />
