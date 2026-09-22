@@ -1,5 +1,6 @@
 import { Search, CheckCircle2, XCircle, RotateCcw } from 'lucide-react';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 
 interface HistoryItem {
   id: number;
@@ -8,6 +9,62 @@ interface HistoryItem {
   status: 'Thành công' | 'Thất bại';
   time: string;
 }
+
+// Hàm tìm kiếm thời gian linh hoạt (hỗ trợ YYYY-MM-DD, DD/MM/YYYY, DD-MM-YYYY, HH:mm,...)
+const matchesTimeSearch = (itemTime: string, rawQuery: string): boolean => {
+  const query = rawQuery.trim().toLowerCase();
+  if (!query) return true;
+
+  // Kiểm tra trực tiếp chuỗi con
+  if (itemTime.toLowerCase().includes(query)) return true;
+
+  // Phân tích định dạng "DD/MM/YYYY HH:mm:ss" của dữ liệu
+  const match = /^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}:\d{1,2}(?::\d{1,2})?))?$/.exec(itemTime.trim());
+  if (match) {
+    const [, d, m, y, timePart] = match;
+    const day = d.padStart(2, '0');
+    const month = m.padStart(2, '0');
+    const dayNum = parseInt(d, 10).toString();
+    const monthNum = parseInt(m, 10).toString();
+
+    // Các biến thể ngày/tháng/năm tương đương
+    const variants = [
+      `${y}-${month}-${day}`,        // 2026-09-12 (chuẩn YYYY-MM-DD)
+      `${y}/${month}/${day}`,        // 2026/09/12
+      `${y}-${monthNum}-${dayNum}`,  // 2026-9-12
+      `${day}-${month}-${y}`,        // 12-09-2026
+      `${day}/${month}/${y}`,        // 12/09/2026
+      `${dayNum}/${monthNum}/${y}`,  // 12/9/2026
+      `${dayNum}-${monthNum}-${y}`,  // 12-9-2026
+      `${y}-${month}`,               // 2026-09
+      `${month}/${y}`,               // 09/2026
+      `${day}/${month}`,             // 12/09
+      `${day}-${month}`,             // 12-09
+    ];
+
+    if (timePart) {
+      variants.push(timePart);
+      variants.push(`${y}-${month}-${day} ${timePart}`);
+      variants.push(`${day}/${month}/${y} ${timePart}`);
+    }
+
+    const slashQuery = query.replace(/[-.]/g, '/');
+    const dashQuery = query.replace(/[./]/g, '-');
+
+    if (
+      variants.some(
+        (v) =>
+          v.toLowerCase().includes(query) ||
+          v.toLowerCase().includes(slashQuery) ||
+          v.toLowerCase().includes(dashQuery)
+      )
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+};
 
 const mockData: HistoryItem[] = [
   { id: 20, name: 'LED 1', action: 'Bật', status: 'Thành công', time: '12/09/2026 21:46:12' },
@@ -28,21 +85,55 @@ const mockData: HistoryItem[] = [
 ];
 
 export default function History() {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [deviceFilter, setDeviceFilter] = useState('ALL');
-  const [statusFilter, setStatusFilter] = useState('ALL');
-  const [pageSize, setPageSize] = useState(10);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Khởi tạo state từ searchParams hoặc sessionStorage để giữ nguyên khi reload
+  const [searchTerm, setSearchTerm] = useState(() => {
+    return searchParams.get('time') || sessionStorage.getItem('history_time') || '';
+  });
+
+  const [deviceFilter, setDeviceFilter] = useState(() => {
+    return searchParams.get('device') || sessionStorage.getItem('history_device') || 'ALL';
+  });
+
+  const [statusFilter, setStatusFilter] = useState(() => {
+    return searchParams.get('status') || sessionStorage.getItem('history_status') || 'ALL';
+  });
+
+  const [pageSize, setPageSize] = useState(() => {
+    const s = searchParams.get('size') || sessionStorage.getItem('history_size');
+    return s ? Number(s) : 10;
+  });
+
+  const [currentPage, setCurrentPage] = useState(() => {
+    const p = searchParams.get('page') || sessionStorage.getItem('history_page');
+    return p ? Number(p) : 1;
+  });
+
+  // Đồng bộ filter vào URL searchParams và sessionStorage khi có thay đổi
+  useEffect(() => {
+    sessionStorage.setItem('history_device', deviceFilter);
+    sessionStorage.setItem('history_status', statusFilter);
+    sessionStorage.setItem('history_time', searchTerm);
+    sessionStorage.setItem('history_size', String(pageSize));
+    sessionStorage.setItem('history_page', String(currentPage));
+
+    const params: Record<string, string> = {};
+    if (deviceFilter !== 'ALL') params.device = deviceFilter;
+    if (statusFilter !== 'ALL') params.status = statusFilter;
+    if (searchTerm.trim()) params.time = searchTerm.trim();
+    if (currentPage > 1) params.page = String(currentPage);
+    if (pageSize !== 10) params.size = String(pageSize);
+
+    setSearchParams(params, { replace: true });
+  }, [deviceFilter, statusFilter, searchTerm, pageSize, currentPage, setSearchParams]);
 
   // Filter data based on search term, device, and status
   const filteredData = useMemo(() => {
     return mockData.filter((item) => {
       const matchDevice = deviceFilter === 'ALL' || item.name === deviceFilter;
       const matchStatus = statusFilter === 'ALL' || item.status === statusFilter;
-      const term = searchTerm.trim().toLowerCase();
-      const matchSearch =
-        !term ||
-        item.time.toLowerCase().includes(term);
+      const matchSearch = matchesTimeSearch(item.time, searchTerm);
 
       return matchDevice && matchStatus && matchSearch;
     });
@@ -62,6 +153,12 @@ export default function History() {
     setDeviceFilter('ALL');
     setStatusFilter('ALL');
     setCurrentPage(1);
+    sessionStorage.removeItem('history_device');
+    sessionStorage.removeItem('history_status');
+    sessionStorage.removeItem('history_time');
+    sessionStorage.removeItem('history_size');
+    sessionStorage.removeItem('history_page');
+    setSearchParams({}, { replace: true });
   };
 
   return (
@@ -73,7 +170,7 @@ export default function History() {
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             type="text"
-            placeholder="Tìm kiếm..."
+            placeholder="Tìm kiếm theo thời gian..."
             className="w-full pl-10 pr-4 py-2 bg-gray-50/80 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#2a1b4d]/20 focus:border-[#2a1b4d] focus:bg-white transition-all text-gray-800 placeholder-gray-400"
             value={searchTerm}
             onChange={(e) => {

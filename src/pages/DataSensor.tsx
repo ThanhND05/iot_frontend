@@ -1,5 +1,6 @@
 import { Search, RotateCcw, Thermometer, Droplets, Lightbulb } from 'lucide-react';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 
 interface SensorItem {
   id: number;
@@ -7,6 +8,62 @@ interface SensorItem {
   value: string;
   time: string;
 }
+
+// Hàm tìm kiếm thời gian linh hoạt (hỗ trợ YYYY-MM-DD, DD/MM/YYYY, DD-MM-YYYY, HH:mm,...)
+const matchesTimeSearch = (itemTime: string, rawQuery: string): boolean => {
+  const query = rawQuery.trim().toLowerCase();
+  if (!query) return true;
+
+  // Kiểm tra trực tiếp chuỗi con
+  if (itemTime.toLowerCase().includes(query)) return true;
+
+  // Phân tích định dạng "DD/MM/YYYY HH:mm:ss" của dữ liệu
+  const match = /^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}:\d{1,2}(?::\d{1,2})?))?$/.exec(itemTime.trim());
+  if (match) {
+    const [, d, m, y, timePart] = match;
+    const day = d.padStart(2, '0');
+    const month = m.padStart(2, '0');
+    const dayNum = parseInt(d, 10).toString();
+    const monthNum = parseInt(m, 10).toString();
+
+    // Các biến thể ngày/tháng/năm tương đương
+    const variants = [
+      `${y}-${month}-${day}`,        // 2026-09-12 (chuẩn YYYY-MM-DD)
+      `${y}/${month}/${day}`,        // 2026/09/12
+      `${y}-${monthNum}-${dayNum}`,  // 2026-9-12
+      `${day}-${month}-${y}`,        // 12-09-2026
+      `${day}/${month}/${y}`,        // 12/09/2026
+      `${dayNum}/${monthNum}/${y}`,  // 12/9/2026
+      `${dayNum}-${monthNum}-${y}`,  // 12-9-2026
+      `${y}-${month}`,               // 2026-09
+      `${month}/${y}`,               // 09/2026
+      `${day}/${month}`,             // 12/09
+      `${day}-${month}`,             // 12-09
+    ];
+
+    if (timePart) {
+      variants.push(timePart);
+      variants.push(`${y}-${month}-${day} ${timePart}`);
+      variants.push(`${day}/${month}/${y} ${timePart}`);
+    }
+
+    const slashQuery = query.replace(/[-.]/g, '/');
+    const dashQuery = query.replace(/[./]/g, '-');
+
+    if (
+      variants.some(
+        (v) =>
+          v.toLowerCase().includes(query) ||
+          v.toLowerCase().includes(slashQuery) ||
+          v.toLowerCase().includes(dashQuery)
+      )
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+};
 
 const mockData: SensorItem[] = [
   { id: 25, type: 'Nhiệt độ', value: '32.4°C', time: '12/09/2026 22:12:05' },
@@ -33,19 +90,48 @@ const mockData: SensorItem[] = [
 ];
 
 export default function DataSensor() {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [sensorFilter, setSensorFilter] = useState('ALL');
-  const [pageSize, setPageSize] = useState(10);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  // Filter data based on search term (including time) and sensor type
+  // Khởi tạo state từ URL searchParams hoặc sessionStorage để giữ nguyên khi reload
+  const [searchTerm, setSearchTerm] = useState(() => {
+    return searchParams.get('time') || sessionStorage.getItem('datasensor_time') || '';
+  });
+
+  const [sensorFilter, setSensorFilter] = useState(() => {
+    return searchParams.get('type') || sessionStorage.getItem('datasensor_type') || 'ALL';
+  });
+
+  const [pageSize, setPageSize] = useState(() => {
+    const s = searchParams.get('size') || sessionStorage.getItem('datasensor_size');
+    return s ? Number(s) : 10;
+  });
+
+  const [currentPage, setCurrentPage] = useState(() => {
+    const p = searchParams.get('page') || sessionStorage.getItem('datasensor_page');
+    return p ? Number(p) : 1;
+  });
+
+  // Đồng bộ filter vào URL searchParams và sessionStorage khi có thay đổi
+  useEffect(() => {
+    sessionStorage.setItem('datasensor_type', sensorFilter);
+    sessionStorage.setItem('datasensor_time', searchTerm);
+    sessionStorage.setItem('datasensor_size', String(pageSize));
+    sessionStorage.setItem('datasensor_page', String(currentPage));
+
+    const params: Record<string, string> = {};
+    if (sensorFilter !== 'ALL') params.type = sensorFilter;
+    if (searchTerm.trim()) params.time = searchTerm.trim();
+    if (currentPage > 1) params.page = String(currentPage);
+    if (pageSize !== 10) params.size = String(pageSize);
+
+    setSearchParams(params, { replace: true });
+  }, [sensorFilter, searchTerm, pageSize, currentPage, setSearchParams]);
+
+  // Filter data based on search term (including flexible time/date) and sensor type
   const filteredData = useMemo(() => {
     return mockData.filter((item) => {
       const matchType = sensorFilter === 'ALL' || item.type === sensorFilter;
-      const term = searchTerm.trim().toLowerCase();
-      const matchSearch =
-        !term ||
-        item.time.toLowerCase().includes(term);
+      const matchSearch = matchesTimeSearch(item.time, searchTerm);
 
       return matchType && matchSearch;
     });
@@ -63,6 +149,11 @@ export default function DataSensor() {
     setSearchTerm('');
     setSensorFilter('ALL');
     setCurrentPage(1);
+    sessionStorage.removeItem('datasensor_type');
+    sessionStorage.removeItem('datasensor_time');
+    sessionStorage.removeItem('datasensor_size');
+    sessionStorage.removeItem('datasensor_page');
+    setSearchParams({}, { replace: true });
   };
 
   return (
@@ -74,7 +165,7 @@ export default function DataSensor() {
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             type="text"
-            placeholder="Tìm kiếm theo ID, loại, thời gian..."
+            placeholder="Tìm kiếm theo thời gian..."
             className="w-full pl-10 pr-4 py-2 bg-gray-50/80 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#2a1b4d]/20 focus:border-[#2a1b4d] focus:bg-white transition-all text-gray-800 placeholder-gray-400"
             value={searchTerm}
             onChange={(e) => {
@@ -139,10 +230,10 @@ export default function DataSensor() {
                   <td className="py-4 px-6">
                     <span
                       className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${row.type === 'Nhiệt độ'
-                          ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                          : row.type === 'Độ ẩm'
-                            ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                            : 'bg-amber-50 text-amber-700 border border-amber-200'
+                        ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                        : row.type === 'Độ ẩm'
+                          ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                          : 'bg-amber-50 text-amber-700 border border-amber-200'
                         }`}
                     >
                       {row.type === 'Nhiệt độ' && <Thermometer className="w-3.5 h-3.5" />}
