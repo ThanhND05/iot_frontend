@@ -1,4 +1,4 @@
-import { Search, CheckCircle2, XCircle, RotateCcw } from 'lucide-react';
+import { Search, RotateCcw } from 'lucide-react';
 import { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
@@ -146,11 +146,12 @@ export default function History() {
     });
   }, [searchTerm, deviceFilter, actionFilter, statusFilter]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredData.length / pageSize));
+  const validPageSize = pageSize > 0 ? pageSize : 10;
+  const totalPages = Math.max(1, Math.ceil(filteredData.length / validPageSize));
   const currentData = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return filteredData.slice(start, start + pageSize);
-  }, [filteredData, currentPage, pageSize]);
+    const start = (currentPage - 1) * validPageSize;
+    return filteredData.slice(start, start + validPageSize);
+  }, [filteredData, currentPage, validPageSize]);
 
   // Handle page reset if current page exceeds total
   const safePage = Math.min(currentPage, totalPages);
@@ -171,16 +172,16 @@ export default function History() {
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 flex flex-col h-full animate-in fade-in duration-500">
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 flex flex-col h-full overflow-hidden animate-in fade-in duration-500">
       {/* Toolbar: Search on the left, Filters on the right (same row) */}
-      <div className="p-6 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="px-5 py-2.5 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-3 shrink-0">
         {/* Expanded search input on the left */}
         <div className="relative flex-1 max-w-sm lg:max-w-md min-w-[200px]">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
           <input
             type="text"
             placeholder="Tìm kiếm theo thời gian..."
-            className="w-full pl-10 pr-4 py-2 bg-gray-50/80 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#2a1b4d]/20 focus:border-[#2a1b4d] focus:bg-white transition-all text-gray-800 placeholder-gray-400"
+            className="w-full pl-9 pr-3 py-1.5 bg-gray-50/80 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#2a1b4d]/20 focus:border-[#2a1b4d] focus:bg-white transition-all text-gray-800 placeholder-gray-400"
             value={searchTerm}
             onChange={(e) => {
               setSearchTerm(e.target.value);
@@ -192,10 +193,10 @@ export default function History() {
         {/* Filters and Reset button grouped on the right in one single row */}
         <div className="flex items-center gap-3 shrink-0 flex-nowrap overflow-x-auto">
           {/* Device Filter */}
-          <div className="flex items-center gap-2 shrink-0">
-            <span className="text-sm font-medium text-gray-600 whitespace-nowrap">Tên thiết bị:</span>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className="text-xs font-medium text-gray-600 whitespace-nowrap">Tên thiết bị:</span>
             <select
-              className="bg-gray-50/80 border border-gray-200 rounded-xl px-3 py-2 text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-[#2a1b4d]/20 focus:border-[#2a1b4d] transition-all"
+              className="bg-gray-50/80 border border-gray-200 rounded-xl px-2.5 py-1.5 text-xs font-medium text-gray-700 cursor-pointer hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-[#2a1b4d]/20 focus:border-[#2a1b4d] transition-all"
               value={deviceFilter}
               onChange={(e) => {
                 setDeviceFilter(e.target.value);
@@ -210,10 +211,10 @@ export default function History() {
           </div>
 
           {/* Action Filter */}
-          <div className="flex items-center gap-2 shrink-0">
-            <span className="text-sm font-medium text-gray-600 whitespace-nowrap">Hành động:</span>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className="text-xs font-medium text-gray-600 whitespace-nowrap">Hành động:</span>
             <select
-              className="bg-gray-50/80 border border-gray-200 rounded-xl px-3 py-2 text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-[#2a1b4d]/20 focus:border-[#2a1b4d] transition-all"
+              className="bg-gray-50/80 border border-gray-200 rounded-xl px-2.5 py-1.5 text-xs font-medium text-gray-700 cursor-pointer hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-[#2a1b4d]/20 focus:border-[#2a1b4d] transition-all"
               value={actionFilter}
               onChange={(e) => {
                 setActionFilter(e.target.value);
@@ -227,10 +228,10 @@ export default function History() {
           </div>
 
           {/* Status Filter */}
-          <div className="flex items-center gap-2 shrink-0">
-            <span className="text-sm font-medium text-gray-600 whitespace-nowrap">Trạng thái:</span>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className="text-xs font-medium text-gray-600 whitespace-nowrap">Trạng thái:</span>
             <select
-              className="bg-gray-50/80 border border-gray-200 rounded-xl px-3 py-2 text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-[#2a1b4d]/20 focus:border-[#2a1b4d] transition-all"
+              className="bg-gray-50/80 border border-gray-200 rounded-xl px-2.5 py-1.5 text-xs font-medium text-gray-700 cursor-pointer hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-[#2a1b4d]/20 focus:border-[#2a1b4d] transition-all"
               value={statusFilter}
               onChange={(e) => {
                 setStatusFilter(e.target.value);
@@ -247,7 +248,7 @@ export default function History() {
           <button
             onClick={resetFilters}
             title="Đặt lại bộ lọc"
-            className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 bg-gray-100 hover:bg-gray-200/80 rounded-xl transition-all shrink-0 whitespace-nowrap cursor-pointer"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:text-gray-900 bg-gray-100 hover:bg-gray-200/80 rounded-xl transition-all shrink-0 whitespace-nowrap cursor-pointer"
           >
             <RotateCcw className="w-3.5 h-3.5" />
             <span>Đặt lại</span>
@@ -256,18 +257,19 @@ export default function History() {
       </div>
 
       {/* Table */}
-      <div className="flex-1 overflow-auto px-6 pb-6 mt-4">
+      <div className="flex-1 min-h-0 overflow-y-auto px-5 py-2">
         <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="bg-[#2a1b4d] text-white">
-              <th className="py-4 px-6 font-semibold rounded-tl-xl w-24">ID</th>
-              <th className="py-4 px-6 font-semibold">Tên thiết bị</th>
-              <th className="py-4 px-6 font-semibold">Hành động</th>
-              <th className="py-4 px-6 font-semibold">Trạng thái</th>
-              <th className="py-4 px-6 font-semibold rounded-tr-xl">Thời gian thực hiện</th>
+          <thead className="sticky top-0 z-10">
+            <tr className="bg-[#2a1b4d] text-white text-xs">
+              <th className="py-2.5 px-4 font-semibold rounded-tl-xl w-16">ID</th>
+              <th className="py-2.5 px-4 font-semibold">Người thực hiện</th>
+              <th className="py-2.5 px-4 font-semibold">Tên thiết bị</th>
+              <th className="py-2.5 px-4 font-semibold">Hành động</th>
+              <th className="py-2.5 px-4 font-semibold">Trạng thái</th>
+              <th className="py-2.5 px-4 font-semibold rounded-tr-xl">Thời gian thực hiện</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="text-xs">
             {currentData.length > 0 ? (
               currentData.map((row, idx) => (
                 <tr
@@ -275,11 +277,12 @@ export default function History() {
                   className={`border-b border-gray-100 hover:bg-purple-50/30 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'
                     }`}
                 >
-                  <td className="py-4 px-6 text-gray-600 font-mono text-sm">{row.id}</td>
-                  <td className="py-4 px-6 text-gray-900 font-medium">{row.name}</td>
-                  <td className="py-4 px-6">
+                  <td className="py-2 px-4 text-gray-600 font-mono">{row.id}</td>
+                  <td className="py-2 px-4 text-gray-800 font-medium">Nguyễn Duy Thanh</td>
+                  <td className="py-2 px-4 text-gray-900 font-medium">{row.name}</td>
+                  <td className="py-2 px-4">
                     <span
-                      className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold ${row.action === 'Bật'
+                      className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold ${row.action === 'Bật'
                           ? 'bg-blue-50 text-blue-700 border border-blue-200'
                           : 'bg-gray-100 text-gray-600 border border-gray-200'
                         }`}
@@ -287,33 +290,28 @@ export default function History() {
                       {row.action}
                     </span>
                   </td>
-                  <td className="py-4 px-6">
+                  <td className="py-2 px-4">
                     <span
-                      className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${row.status === 'Thành công'
+                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${row.status === 'Thành công'
                           ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                           : 'bg-rose-50 text-rose-700 border border-rose-200'
                         }`}
                     >
-                      {row.status === 'Thành công' ? (
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                      ) : (
-                        <XCircle className="w-3.5 h-3.5" />
-                      )}
                       {row.status}
                     </span>
                   </td>
-                  <td className="py-4 px-6 text-gray-500 text-sm font-mono">{row.time}</td>
+                  <td className="py-2 px-4 text-gray-500 font-mono">{row.time}</td>
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan={5} className="py-12 text-center text-gray-400">
+                <td colSpan={6} className="py-10 text-center text-gray-400">
                   <div className="flex flex-col items-center justify-center gap-2">
                     <Search className="w-8 h-8 text-gray-300" />
                     <p className="text-sm font-medium">Không tìm thấy dữ liệu phù hợp</p>
                     <button
                       onClick={resetFilters}
-                      className="text-xs text-[#2a1b4d] underline font-medium mt-1"
+                      className="text-xs text-[#2a1b4d] underline font-medium mt-1 cursor-pointer"
                     >
                       Xóa bộ lọc
                     </button>
@@ -326,45 +324,57 @@ export default function History() {
       </div>
 
       {/* Pagination */}
-      <div className="p-4 border-t border-gray-100 flex items-center justify-between text-sm text-gray-600 px-6">
-        <div className="text-xs text-gray-500">
-          Hiển thị <span className="font-semibold text-gray-700">{filteredData.length > 0 ? (safePage - 1) * pageSize + 1 : 0}</span> đến{' '}
+      <div className="px-5 py-2.5 border-t border-gray-100 flex items-center justify-between text-xs text-gray-600 shrink-0">
+        <div className="text-gray-500">
+          Hiển thị <span className="font-semibold text-gray-700">{filteredData.length > 0 ? (safePage - 1) * validPageSize + 1 : 0}</span> đến{' '}
           <span className="font-semibold text-gray-700">
-            {Math.min(safePage * pageSize, filteredData.length)}
+            {Math.min(safePage * validPageSize, filteredData.length)}
           </span>{' '}
           trong <span className="font-semibold text-gray-700">{filteredData.length}</span> bản ghi
         </div>
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-1.5">
-            <span className="text-xs">Số hàng:</span>
-            <select
-              value={pageSize}
+            <span>Số hàng:</span>
+            <input
+              type="number"
+              min={1}
+              max={100}
+              value={pageSize || ''}
               onChange={(e) => {
-                setPageSize(Number(e.target.value));
-                setCurrentPage(1);
+                const val = e.target.value;
+                if (val === '') {
+                  setPageSize(0);
+                } else {
+                  const num = parseInt(val, 10);
+                  if (!isNaN(num) && num > 0) {
+                    setPageSize(num);
+                    setCurrentPage(1);
+                  }
+                }
               }}
-              className="bg-gray-50 border border-gray-200 rounded-lg px-2 py-1 text-xs font-medium cursor-pointer focus:outline-none"
-            >
-              <option value={5}>5</option>
-              <option value={10}>10</option>
-              <option value={15}>15</option>
-            </select>
+              onBlur={() => {
+                if (!pageSize || pageSize < 1) {
+                  setPageSize(10);
+                }
+              }}
+              className="w-14 bg-gray-50/80 border border-gray-200 rounded-lg px-2 py-1 text-xs font-semibold text-center text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#2a1b4d]/20 focus:border-[#2a1b4d] focus:bg-white transition-all"
+            />
           </div>
-          <span className="text-xs font-medium">
+          <span className="font-medium">
             Trang {safePage} / {totalPages}
           </span>
           <div className="flex gap-1">
             <button
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
               disabled={safePage <= 1}
-              className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-xs"
+              className="p-1 px-2 rounded-lg border border-gray-200 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-xs cursor-pointer"
             >
               &lt;
             </button>
             <button
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
               disabled={safePage >= totalPages}
-              className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-xs"
+              className="p-1 px-2 rounded-lg border border-gray-200 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-xs cursor-pointer"
             >
               &gt;
             </button>

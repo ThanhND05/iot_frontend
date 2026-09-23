@@ -1,4 +1,4 @@
-import { Search, RotateCcw, Thermometer, Droplets, Lightbulb } from 'lucide-react';
+import { Search, RotateCcw } from 'lucide-react';
 import { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
@@ -8,6 +8,30 @@ interface SensorItem {
   value: string;
   time: string;
 }
+
+// Hàm tìm kiếm giá trị cảm biến linh hoạt (vd: nhập 32 ra 32.0°C, 32.4°C,...)
+const matchesValueSearch = (itemValue: string, rawQuery: string): boolean => {
+  const query = rawQuery.trim().toLowerCase();
+  if (!query) return true;
+
+  if (itemValue.toLowerCase().includes(query)) return true;
+
+  const numOnlyQuery = query.replace(/[^\d.]/g, '');
+  const numOnlyValue = itemValue.replace(/[^\d.]/g, '');
+
+  if (numOnlyQuery) {
+    if (numOnlyValue.includes(numOnlyQuery)) return true;
+    if (numOnlyValue.startsWith(numOnlyQuery)) return true;
+
+    const queryInt = parseInt(numOnlyQuery, 10);
+    const valFloat = parseFloat(numOnlyValue);
+    if (!isNaN(queryInt) && !isNaN(valFloat) && Math.floor(valFloat) === queryInt) {
+      return true;
+    }
+  }
+
+  return false;
+};
 
 // Hàm tìm kiếm thời gian linh hoạt (hỗ trợ YYYY-MM-DD, DD/MM/YYYY, DD-MM-YYYY, HH:mm,...)
 const matchesTimeSearch = (itemTime: string, rawQuery: string): boolean => {
@@ -94,7 +118,7 @@ export default function DataSensor() {
 
   // Khởi tạo state từ URL searchParams hoặc sessionStorage để giữ nguyên khi reload
   const [searchTerm, setSearchTerm] = useState(() => {
-    return searchParams.get('time') || sessionStorage.getItem('datasensor_time') || '';
+    return searchParams.get('search') || sessionStorage.getItem('datasensor_search') || '';
   });
 
   const [sensorFilter, setSensorFilter] = useState(() => {
@@ -114,34 +138,44 @@ export default function DataSensor() {
   // Đồng bộ filter vào URL searchParams và sessionStorage khi có thay đổi
   useEffect(() => {
     sessionStorage.setItem('datasensor_type', sensorFilter);
-    sessionStorage.setItem('datasensor_time', searchTerm);
+    sessionStorage.setItem('datasensor_search', searchTerm);
     sessionStorage.setItem('datasensor_size', String(pageSize));
     sessionStorage.setItem('datasensor_page', String(currentPage));
 
     const params: Record<string, string> = {};
     if (sensorFilter !== 'ALL') params.type = sensorFilter;
-    if (searchTerm.trim()) params.time = searchTerm.trim();
+    if (searchTerm.trim()) params.search = searchTerm.trim();
     if (currentPage > 1) params.page = String(currentPage);
     if (pageSize !== 10) params.size = String(pageSize);
 
     setSearchParams(params, { replace: true });
   }, [sensorFilter, searchTerm, pageSize, currentPage, setSearchParams]);
 
-  // Filter data based on search term (including flexible time/date) and sensor type
+  // Logic lọc:
+  // - Khi chọn "Thời gian": chỉ tìm kiếm theo thời gian
+  // - Khi chọn các lựa chọn khác (Tất cả, Nhiệt độ, Độ ẩm, Ánh sáng): có thể tìm kiếm cả theo thời gian và chỉ số
   const filteredData = useMemo(() => {
     return mockData.filter((item) => {
+      if (sensorFilter === 'Thời gian') {
+        return !searchTerm.trim() || matchesTimeSearch(item.time, searchTerm);
+      }
+
       const matchType = sensorFilter === 'ALL' || item.type === sensorFilter;
-      const matchSearch = matchesTimeSearch(item.time, searchTerm);
+      const matchSearch =
+        !searchTerm.trim() ||
+        matchesValueSearch(item.value, searchTerm) ||
+        matchesTimeSearch(item.time, searchTerm);
 
       return matchType && matchSearch;
     });
   }, [searchTerm, sensorFilter]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredData.length / pageSize));
+  const validPageSize = pageSize > 0 ? pageSize : 10;
+  const totalPages = Math.max(1, Math.ceil(filteredData.length / validPageSize));
   const currentData = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return filteredData.slice(start, start + pageSize);
-  }, [filteredData, currentPage, pageSize]);
+    const start = (currentPage - 1) * validPageSize;
+    return filteredData.slice(start, start + validPageSize);
+  }, [filteredData, currentPage, validPageSize]);
 
   const safePage = Math.min(currentPage, totalPages);
 
@@ -150,23 +184,33 @@ export default function DataSensor() {
     setSensorFilter('ALL');
     setCurrentPage(1);
     sessionStorage.removeItem('datasensor_type');
-    sessionStorage.removeItem('datasensor_time');
+    sessionStorage.removeItem('datasensor_search');
     sessionStorage.removeItem('datasensor_size');
     sessionStorage.removeItem('datasensor_page');
     setSearchParams({}, { replace: true });
   };
 
+  const getSearchPlaceholder = () => {
+    if (sensorFilter === 'Thời gian') {
+      return 'Tìm kiếm theo thời gian...';
+    }
+    if (sensorFilter === 'ALL') {
+      return 'Tìm kiếm theo giá trị hoặc thời gian...';
+    }
+    return `Tìm kiếm ${sensorFilter.toLowerCase()} theo giá trị hoặc thời gian...`;
+  };
+
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 flex flex-col h-full animate-in fade-in duration-500">
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 flex flex-col h-full overflow-hidden animate-in fade-in duration-500">
       {/* Toolbar: Search on the left, Filter & Reset on the right (same row) */}
-      <div className="p-6 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        {/* Search input with time search capability */}
+      <div className="px-5 py-2.5 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-3 shrink-0">
+        {/* Search input linh hoạt */}
         <div className="relative flex-1 max-w-sm lg:max-w-md min-w-[200px]">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
           <input
             type="text"
-            placeholder="Tìm kiếm theo thời gian..."
-            className="w-full pl-10 pr-4 py-2 bg-gray-50/80 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#2a1b4d]/20 focus:border-[#2a1b4d] focus:bg-white transition-all text-gray-800 placeholder-gray-400"
+            placeholder={getSearchPlaceholder()}
+            className="w-full pl-9 pr-3 py-1.5 bg-gray-50/80 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#2a1b4d]/20 focus:border-[#2a1b4d] focus:bg-white transition-all text-gray-800 placeholder-gray-400"
             value={searchTerm}
             onChange={(e) => {
               setSearchTerm(e.target.value);
@@ -177,10 +221,11 @@ export default function DataSensor() {
 
         {/* Filter and Reset button grouped on the right */}
         <div className="flex items-center gap-3 shrink-0 flex-nowrap overflow-x-auto">
-          <div className="flex items-center gap-2 shrink-0">
-            <span className="text-sm font-medium text-gray-600 whitespace-nowrap">Loại cảm biến:</span>
+          {/* Dropdown Bộ lọc (Loại cảm biến + Thời gian) */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className="text-xs font-medium text-gray-600 whitespace-nowrap">Loại cảm biến:</span>
             <select
-              className="bg-gray-50/80 border border-gray-200 rounded-xl px-3 py-2 text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-[#2a1b4d]/20 focus:border-[#2a1b4d] transition-all"
+              className="bg-gray-50/80 border border-gray-200 rounded-xl px-2.5 py-1.5 text-xs font-medium text-gray-700 cursor-pointer hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-[#2a1b4d]/20 focus:border-[#2a1b4d] transition-all"
               value={sensorFilter}
               onChange={(e) => {
                 setSensorFilter(e.target.value);
@@ -191,6 +236,7 @@ export default function DataSensor() {
               <option value="Nhiệt độ">Nhiệt độ</option>
               <option value="Độ ẩm">Độ ẩm</option>
               <option value="Ánh sáng">Ánh sáng</option>
+              <option value="Thời gian">Thời gian</option>
             </select>
           </div>
 
@@ -198,7 +244,7 @@ export default function DataSensor() {
           <button
             onClick={resetFilters}
             title="Đặt lại bộ lọc"
-            className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 bg-gray-100 hover:bg-gray-200/80 rounded-xl transition-all shrink-0 whitespace-nowrap cursor-pointer"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:text-gray-900 bg-gray-100 hover:bg-gray-200/80 rounded-xl transition-all shrink-0 whitespace-nowrap cursor-pointer"
           >
             <RotateCcw className="w-3.5 h-3.5" />
             <span>Đặt lại</span>
@@ -207,17 +253,17 @@ export default function DataSensor() {
       </div>
 
       {/* Table */}
-      <div className="flex-1 overflow-auto px-6 pb-6 mt-4">
+      <div className="flex-1 min-h-0 overflow-y-auto px-5 py-2">
         <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="bg-[#2a1b4d] text-white">
-              <th className="py-4 px-6 font-semibold rounded-tl-xl w-24">ID</th>
-              <th className="py-4 px-6 font-semibold">Loại cảm biến</th>
-              <th className="py-4 px-6 font-semibold">Giá trị cảm biến</th>
-              <th className="py-4 px-6 font-semibold rounded-tr-xl">Thời gian đo</th>
+          <thead className="sticky top-0 z-10">
+            <tr className="bg-[#2a1b4d] text-white text-xs">
+              <th className="py-2.5 px-4 font-semibold rounded-tl-xl w-20">ID</th>
+              <th className="py-2.5 px-4 font-semibold">Loại cảm biến</th>
+              <th className="py-2.5 px-4 font-semibold">Giá trị cảm biến</th>
+              <th className="py-2.5 px-4 font-semibold rounded-tr-xl">Thời gian đo</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="text-xs">
             {currentData.length > 0 ? (
               currentData.map((row, idx) => (
                 <tr
@@ -225,29 +271,26 @@ export default function DataSensor() {
                   className={`border-b border-gray-100 hover:bg-purple-50/30 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'
                     }`}
                 >
-                  <td className="py-4 px-6 text-gray-600 font-mono text-sm">{row.id}</td>
-                  <td className="py-4 px-6 text-gray-900 font-medium">{row.type}</td>
-                  <td className="py-4 px-6">
+                  <td className="py-2 px-4 text-gray-600 font-mono">{row.id}</td>
+                  <td className="py-2 px-4 text-gray-900 font-medium">{row.type}</td>
+                  <td className="py-2 px-4">
                     <span
-                      className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${row.type === 'Nhiệt độ'
+                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${row.type === 'Nhiệt độ'
                         ? 'bg-rose-50 text-rose-700 border border-rose-200'
                         : row.type === 'Độ ẩm'
                           ? 'bg-blue-50 text-blue-700 border border-blue-200'
                           : 'bg-amber-50 text-amber-700 border border-amber-200'
                         }`}
                     >
-                      {row.type === 'Nhiệt độ' && <Thermometer className="w-3.5 h-3.5" />}
-                      {row.type === 'Độ ẩm' && <Droplets className="w-3.5 h-3.5" />}
-                      {row.type === 'Ánh sáng' && <Lightbulb className="w-3.5 h-3.5" />}
                       {row.value}
                     </span>
                   </td>
-                  <td className="py-4 px-6 text-gray-500 text-sm font-mono">{row.time}</td>
+                  <td className="py-2 px-4 text-gray-500 font-mono">{row.time}</td>
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan={4} className="py-12 text-center text-gray-400">
+                <td colSpan={4} className="py-10 text-center text-gray-400">
                   <div className="flex flex-col items-center justify-center gap-2">
                     <Search className="w-8 h-8 text-gray-300" />
                     <p className="text-sm font-medium">Không tìm thấy dữ liệu cảm biến phù hợp</p>
@@ -266,45 +309,57 @@ export default function DataSensor() {
       </div>
 
       {/* Pagination */}
-      <div className="p-4 border-t border-gray-100 flex items-center justify-between text-sm text-gray-600 px-6">
-        <div className="text-xs text-gray-500">
-          Hiển thị <span className="font-semibold text-gray-700">{filteredData.length > 0 ? (safePage - 1) * pageSize + 1 : 0}</span> đến{' '}
+      <div className="px-5 py-2.5 border-t border-gray-100 flex items-center justify-between text-xs text-gray-600 shrink-0">
+        <div className="text-gray-500">
+          Hiển thị <span className="font-semibold text-gray-700">{filteredData.length > 0 ? (safePage - 1) * validPageSize + 1 : 0}</span> đến{' '}
           <span className="font-semibold text-gray-700">
-            {Math.min(safePage * pageSize, filteredData.length)}
+            {Math.min(safePage * validPageSize, filteredData.length)}
           </span>{' '}
           trong <span className="font-semibold text-gray-700">{filteredData.length}</span> bản ghi
         </div>
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-1.5">
-            <span className="text-xs">Số hàng:</span>
-            <select
-              value={pageSize}
+            <span>Số hàng:</span>
+            <input
+              type="number"
+              min={1}
+              max={100}
+              value={pageSize || ''}
               onChange={(e) => {
-                setPageSize(Number(e.target.value));
-                setCurrentPage(1);
+                const val = e.target.value;
+                if (val === '') {
+                  setPageSize(0);
+                } else {
+                  const num = parseInt(val, 10);
+                  if (!isNaN(num) && num > 0) {
+                    setPageSize(num);
+                    setCurrentPage(1);
+                  }
+                }
               }}
-              className="bg-gray-50 border border-gray-200 rounded-lg px-2 py-1 text-xs font-medium cursor-pointer focus:outline-none"
-            >
-              <option value={5}>5</option>
-              <option value={10}>10</option>
-              <option value={15}>15</option>
-            </select>
+              onBlur={() => {
+                if (!pageSize || pageSize < 1) {
+                  setPageSize(10);
+                }
+              }}
+              className="w-14 bg-gray-50/80 border border-gray-200 rounded-lg px-2 py-1 text-xs font-semibold text-center text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#2a1b4d]/20 focus:border-[#2a1b4d] focus:bg-white transition-all"
+            />
           </div>
-          <span className="text-xs font-medium">
+          <span className="font-medium">
             Trang {safePage} / {totalPages}
           </span>
           <div className="flex gap-1">
             <button
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
               disabled={safePage <= 1}
-              className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-xs cursor-pointer"
+              className="p-1 px-2 rounded-lg border border-gray-200 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-xs cursor-pointer"
             >
               &lt;
             </button>
             <button
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
               disabled={safePage >= totalPages}
-              className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-xs cursor-pointer"
+              className="p-1 px-2 rounded-lg border border-gray-200 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-xs cursor-pointer"
             >
               &gt;
             </button>

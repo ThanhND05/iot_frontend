@@ -15,10 +15,19 @@ export default function MainLayout() {
   const [isCollapsed, setIsCollapsed] = useState(() => {
     return localStorage.getItem('sidebar_collapsed') === 'true';
   });
+  const [userAvatar, setUserAvatar] = useState(() => localStorage.getItem('user_avatar') || '');
 
   useEffect(() => {
     localStorage.setItem('sidebar_collapsed', String(isCollapsed));
   }, [isCollapsed]);
+
+  useEffect(() => {
+    const handleAvatarUpdate = () => {
+      setUserAvatar(localStorage.getItem('user_avatar') || '');
+    };
+    window.addEventListener('avatarUpdated', handleAvatarUpdate);
+    return () => window.removeEventListener('avatarUpdated', handleAvatarUpdate);
+  }, []);
 
   const getPageTitle = () => {
     switch (location.pathname) {
@@ -93,7 +102,6 @@ export default function MainLayout() {
         {/* Header */}
         <header className="h-20 bg-[#F3F4F6] flex items-center justify-between px-8 z-0 border-b border-gray-200 shrink-0">
           <div>
-            {/* <div className="text-xs sm:text-sm text-gray-500">Chào mừng trở lại,</div> */}
             <h1 className="text-lg sm:text-xl font-bold text-[#2a1b4d] truncate">{getPageTitle()}</h1>
           </div>
           <div className="flex items-center gap-3">
@@ -103,7 +111,7 @@ export default function MainLayout() {
             </div>
             <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold overflow-hidden shadow-md shrink-0">
               <img
-                src="https://ui-avatars.com/api/?name=Thanh+Nguyen&background=2563eb&color=fff"
+                src={userAvatar || "https://ui-avatars.com/api/?name=Thanh+Nguyen&background=2563eb&color=fff"}
                 alt="Avatar"
                 className="w-full h-full object-cover"
               />
@@ -112,7 +120,7 @@ export default function MainLayout() {
         </header>
 
         {/* Page Content */}
-        <div className="flex-1 overflow-y-auto p-6 lg:p-8">
+        <div className="flex-1 min-h-0 p-4 lg:p-5 overflow-hidden flex flex-col">
           <Outlet />
         </div>
       </main>

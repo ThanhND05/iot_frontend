@@ -9,16 +9,20 @@ const waveData = [
   { name: '7', value: 40 }, { name: '8', value: 20 },
 ];
 
-// Mock Data gốc cho biểu đồ lớn (giá trị ánh sáng thực tế 3 chữ số 350-550 Lux)
+// Mock Data gốc cho biểu đồ lớn (12 điểm theo thời gian thực)
 const rawMockRealtimeData = [
-  { time: '22:11:31', temp: 30, humid: 80, light: 420 },
-  { time: '22:11:33', temp: 32, humid: 78, light: 450 },
-  { time: '22:11:35', temp: 31, humid: 75, light: 390 },
-  { time: '22:11:37', temp: 33, humid: 72, light: 480 },
-  { time: '22:11:39', temp: 32, humid: 75, light: 510 },
-  { time: '22:11:41', temp: 34, humid: 78, light: 460 },
-  { time: '22:11:43', temp: 35, humid: 82, light: 550 },
-  { time: '22:11:45', temp: 32, humid: 80, light: 430 },
+  { time: '22:11:31', date: '12/09/2026', temp: 30, humid: 80, light: 420 },
+  { time: '22:11:33', date: '12/09/2026', temp: 32, humid: 78, light: 450 },
+  { time: '22:11:35', date: '12/09/2026', temp: 31, humid: 75, light: 390 },
+  { time: '22:11:37', date: '12/09/2026', temp: 33, humid: 72, light: 480 },
+  { time: '22:11:39', date: '12/09/2026', temp: 32, humid: 75, light: 510 },
+  { time: '22:11:41', date: '12/09/2026', temp: 34, humid: 78, light: 460 },
+  { time: '22:11:43', date: '12/09/2026', temp: 35, humid: 82, light: 550 },
+  { time: '22:11:45', date: '12/09/2026', temp: 32, humid: 80, light: 430 },
+  { time: '22:11:47', date: '12/09/2026', temp: 33, humid: 77, light: 470 },
+  { time: '22:11:49', date: '12/09/2026', temp: 31, humid: 79, light: 440 },
+  { time: '22:11:51', date: '12/09/2026', temp: 34, humid: 74, light: 500 },
+  { time: '22:11:53', date: '12/09/2026', temp: 32, humid: 76, light: 450 },
 ];
 
 // Chuẩn hoá các giá trị về thang đo 100%:
@@ -36,11 +40,13 @@ const mockRealtimeData = rawMockRealtimeData.map((d) => ({
 const CustomTooltip = ({ active, payload }: any) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
+    const displayTime = data.fullTime || (data.date ? `${data.date} ${data.time}` : (data.time?.includes('/') ? data.time : `12/09/2026 ${data.time}`));
+
     return (
-      <div className="bg-white/95 backdrop-blur-xs border border-gray-200 p-3 rounded-xl shadow-lg text-xs space-y-2 min-w-[200px]">
-        <div className="font-bold text-gray-700 pb-1 border-b border-gray-100 flex items-center justify-between">
+      <div className="bg-white/95 backdrop-blur-xs border border-gray-200 p-3 rounded-xl shadow-lg text-xs space-y-2 min-w-[220px]">
+        <div className="font-bold text-gray-700 pb-1 border-b border-gray-100 flex items-center justify-between gap-3">
           <span>Thời gian:</span>
-          <span className="font-mono text-gray-500">{data.time}</span>
+          <span className="font-mono text-gray-600 font-semibold">{displayTime}</span>
         </div>
 
         <div className="flex items-center justify-between gap-3 text-red-600 font-medium">
@@ -73,24 +79,24 @@ const CustomTooltip = ({ active, payload }: any) => {
 };
 
 const StatCard = ({ title, value, unit, icon: Icon, colorClass, iconBgClass, iconColorClass, gradientId }: any) => (
-  <div className="bg-white rounded-2xl shadow-sm p-6 relative overflow-hidden flex flex-col justify-between h-40 border border-gray-100 hover:shadow-md transition-all hover:-translate-y-1">
+  <div className="bg-white rounded-2xl shadow-sm p-4 px-5 relative overflow-hidden flex flex-col justify-between h-28 border border-gray-100 hover:shadow-md transition-all hover:-translate-y-0.5">
     <div className="flex justify-between items-start z-10">
       <div>
-        <h3 className="text-lg font-medium text-gray-700">{title}</h3>
-        <div className="text-3xl font-bold mt-1 text-gray-900">{value} <span className="text-xl font-normal text-gray-500">{unit}</span></div>
+        <h3 className="text-sm font-medium text-gray-600">{title}</h3>
+        <div className="text-2xl font-bold mt-0.5 text-gray-900">{value} <span className="text-base font-normal text-gray-500">{unit}</span></div>
       </div>
       <div className={`p-2 rounded-lg ${iconBgClass}`}>
-        <Icon className={`w-6 h-6 ${iconColorClass}`} />
+        <Icon className={`w-5 h-5 ${iconColorClass}`} />
       </div>
     </div>
-    
-    <div className="absolute bottom-0 left-0 right-0 h-24 opacity-60">
+
+    <div className="absolute bottom-0 left-0 right-0 h-16 opacity-50 pointer-events-none">
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={waveData}>
           <defs>
             <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor={colorClass} stopOpacity={0.4}/>
-              <stop offset="95%" stopColor={colorClass} stopOpacity={0}/>
+              <stop offset="5%" stopColor={colorClass} stopOpacity={0.4} />
+              <stop offset="95%" stopColor={colorClass} stopOpacity={0} />
             </linearGradient>
           </defs>
           <Area type="monotone" dataKey="value" stroke={colorClass} strokeWidth={2} fillOpacity={1} fill={`url(#${gradientId})`} />
@@ -120,24 +126,24 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="flex flex-col gap-3.5 h-full overflow-hidden animate-in fade-in duration-500">
       {/* Top Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 shrink-0">
         <StatCard title="Nhiệt độ" value="32" unit="°C" icon={Thermometer} colorClass="#EF4444" iconBgClass="bg-red-100" iconColorClass="text-red-500" gradientId="colorTemp" />
         <StatCard title="Độ ẩm" value="50" unit="%" icon={Droplets} colorClass="#3B82F6" iconBgClass="bg-blue-100" iconColorClass="text-blue-500" gradientId="colorHumid" />
         <StatCard title="Ánh sáng" value="450" unit="Lux" icon={Lightbulb} colorClass="#F97316" iconBgClass="bg-orange-100" iconColorClass="text-orange-500" gradientId="colorLight" />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3.5 flex-1 min-h-0">
         {/* Main Chart */}
-        <div className="lg:col-span-2 bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col">
-          <h3 className="text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wider">
+        <div className="lg:col-span-2 bg-white p-3.5 px-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col h-full overflow-hidden">
+          <h3 className="text-xs font-semibold text-gray-400 mb-1 uppercase tracking-wider shrink-0">
             Biểu đồ theo thời gian thực
           </h3>
-          
-          <div className="h-[370px] flex-1">
+
+          <div className="flex-1 min-h-0 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={mockRealtimeData} margin={{ top: 10, right: 20, left: -18, bottom: 0 }}>
+              <LineChart data={mockRealtimeData} margin={{ top: 8, right: 15, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
                 <XAxis dataKey="time" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#9CA3AF' }} />
                 <YAxis
@@ -149,10 +155,10 @@ export default function Dashboard() {
                   tick={{ fontSize: 11, fill: '#9CA3AF' }}
                 />
                 <Tooltip content={<CustomTooltip />} />
-                <Legend 
-                  iconType="circle" 
-                  iconSize={7} 
-                  wrapperStyle={{ paddingTop: '6px', fontSize: '11px', bottom: 0 }} 
+                <Legend
+                  iconType="circle"
+                  iconSize={7}
+                  wrapperStyle={{ paddingTop: '2px', fontSize: '11px', bottom: 0 }}
                   formatter={(value) => <span className="text-gray-500 font-medium text-xs ml-0.5 mr-2">{value}</span>}
                 />
                 <Line
@@ -160,27 +166,27 @@ export default function Dashboard() {
                   dataKey="normTemp"
                   name="Nhiệt độ"
                   stroke="#EF4444"
-                  strokeWidth={3}
-                  dot={{ r: 4, strokeWidth: 2 }}
-                  activeDot={{ r: 6 }}
+                  strokeWidth={2.5}
+                  dot={{ r: 3.5, strokeWidth: 1.5 }}
+                  activeDot={{ r: 5.5 }}
                 />
                 <Line
                   type="monotone"
                   dataKey="normLight"
                   name="Ánh sáng"
                   stroke="#F59E0B"
-                  strokeWidth={3}
-                  dot={{ r: 4, strokeWidth: 2 }}
-                  activeDot={{ r: 6 }}
+                  strokeWidth={2.5}
+                  dot={{ r: 3.5, strokeWidth: 1.5 }}
+                  activeDot={{ r: 5.5 }}
                 />
                 <Line
                   type="monotone"
                   dataKey="normHumid"
                   name="Độ ẩm"
                   stroke="#3B82F6"
-                  strokeWidth={3}
-                  dot={{ r: 4, strokeWidth: 2 }}
-                  activeDot={{ r: 6 }}
+                  strokeWidth={2.5}
+                  dot={{ r: 3.5, strokeWidth: 1.5 }}
+                  activeDot={{ r: 5.5 }}
                 />
               </LineChart>
             </ResponsiveContainer>
@@ -188,32 +194,32 @@ export default function Dashboard() {
         </div>
 
         {/* Controls */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col">
-          <h3 className="text-xl font-bold text-center text-gray-800 mb-8 mt-2">Công tắc đèn</h3>
-          
-          <div className="flex-1 flex flex-col justify-center gap-8 px-4">
+        <div className="bg-white p-3.5 px-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col h-full overflow-hidden justify-between">
+          <h3 className="text-base font-bold text-center text-gray-800 mb-1 shrink-0">Công tắc đèn</h3>
+
+          <div className="flex-1 flex flex-col justify-around py-1">
             {[1, 2, 3].map((num) => {
               const key = `led${num}`;
               const isOn = leds[key];
               return (
                 <div key={num} className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <Lightbulb className={`w-8 h-8 transition-colors duration-300 ${isOn ? 'text-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,0.5)]' : 'text-gray-300'}`} />
+                    <Lightbulb className={`w-7 h-7 transition-colors duration-300 ${isOn ? 'text-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,0.5)]' : 'text-gray-300'}`} />
                     <div>
-                      <span className="text-lg font-medium text-gray-700">LED {num}</span>
+                      <span className="text-base font-medium text-gray-700">LED {num}</span>
                       <div className={`text-xs font-medium transition-colors ${isOn ? 'text-emerald-600' : 'text-gray-400'}`}>
                         {isOn ? 'Đang bật' : 'Đang tắt'}
                       </div>
                     </div>
                   </div>
-                  
+
                   {/* Toggle Switch */}
-                  <button 
+                  <button
                     onClick={() => toggleLed(key)}
-                    className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#2a1b4d] cursor-pointer ${isOn ? 'bg-[#2a1b4d]' : 'bg-gray-200'}`}
+                    className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#2a1b4d] cursor-pointer ${isOn ? 'bg-[#2a1b4d]' : 'bg-gray-200'}`}
                     title={isOn ? `Tắt LED ${num}` : `Bật LED ${num}`}
                   >
-                    <span className={`inline-block h-6 w-6 transform rounded-full bg-white transition duration-300 shadow-sm ${isOn ? 'translate-x-7' : 'translate-x-1'}`} />
+                    <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition duration-300 shadow-sm ${isOn ? 'translate-x-6' : 'translate-x-1'}`} />
                   </button>
                 </div>
               );
