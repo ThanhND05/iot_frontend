@@ -130,26 +130,31 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Chart */}
-        <div className="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col">
-          <h3 className="text-sm font-semibold text-gray-500 mb-6 uppercase tracking-wider">
+        <div className="lg:col-span-2 bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col">
+          <h3 className="text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wider">
             Biểu đồ theo thời gian thực
           </h3>
           
-          <div className="h-80 flex-1">
+          <div className="h-[370px] flex-1">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={mockRealtimeData} margin={{ top: 5, right: 30, left: -10, bottom: 5 }}>
+              <LineChart data={mockRealtimeData} margin={{ top: 10, right: 20, left: -18, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                <XAxis dataKey="time" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#9CA3AF' }} />
+                <XAxis dataKey="time" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#9CA3AF' }} />
                 <YAxis
                   domain={[0, 100]}
                   ticks={[0, 25, 50, 75, 100]}
                   tickFormatter={(val) => `${val}%`}
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fontSize: 12, fill: '#9CA3AF' }}
+                  tick={{ fontSize: 11, fill: '#9CA3AF' }}
                 />
                 <Tooltip content={<CustomTooltip />} />
-                <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px' }} />
+                <Legend 
+                  iconType="circle" 
+                  iconSize={7} 
+                  wrapperStyle={{ paddingTop: '6px', fontSize: '11px', bottom: 0 }} 
+                  formatter={(value) => <span className="text-gray-500 font-medium text-xs ml-0.5 mr-2">{value}</span>}
+                />
                 <Line
                   type="monotone"
                   dataKey="normTemp"
@@ -161,18 +166,18 @@ export default function Dashboard() {
                 />
                 <Line
                   type="monotone"
-                  dataKey="normHumid"
-                  name="Độ ẩm"
-                  stroke="#3B82F6"
+                  dataKey="normLight"
+                  name="Ánh sáng"
+                  stroke="#F59E0B"
                   strokeWidth={3}
                   dot={{ r: 4, strokeWidth: 2 }}
                   activeDot={{ r: 6 }}
                 />
                 <Line
                   type="monotone"
-                  dataKey="normLight"
-                  name="Ánh sáng"
-                  stroke="#F59E0B"
+                  dataKey="normHumid"
+                  name="Độ ẩm"
+                  stroke="#3B82F6"
                   strokeWidth={3}
                   dot={{ r: 4, strokeWidth: 2 }}
                   activeDot={{ r: 6 }}

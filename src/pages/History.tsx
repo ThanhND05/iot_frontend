@@ -96,6 +96,10 @@ export default function History() {
     return searchParams.get('device') || sessionStorage.getItem('history_device') || 'ALL';
   });
 
+  const [actionFilter, setActionFilter] = useState(() => {
+    return searchParams.get('action') || sessionStorage.getItem('history_action') || 'ALL';
+  });
+
   const [statusFilter, setStatusFilter] = useState(() => {
     return searchParams.get('status') || sessionStorage.getItem('history_status') || 'ALL';
   });
@@ -113,6 +117,7 @@ export default function History() {
   // Đồng bộ filter vào URL searchParams và sessionStorage khi có thay đổi
   useEffect(() => {
     sessionStorage.setItem('history_device', deviceFilter);
+    sessionStorage.setItem('history_action', actionFilter);
     sessionStorage.setItem('history_status', statusFilter);
     sessionStorage.setItem('history_time', searchTerm);
     sessionStorage.setItem('history_size', String(pageSize));
@@ -120,24 +125,26 @@ export default function History() {
 
     const params: Record<string, string> = {};
     if (deviceFilter !== 'ALL') params.device = deviceFilter;
+    if (actionFilter !== 'ALL') params.action = actionFilter;
     if (statusFilter !== 'ALL') params.status = statusFilter;
     if (searchTerm.trim()) params.time = searchTerm.trim();
     if (currentPage > 1) params.page = String(currentPage);
     if (pageSize !== 10) params.size = String(pageSize);
 
     setSearchParams(params, { replace: true });
-  }, [deviceFilter, statusFilter, searchTerm, pageSize, currentPage, setSearchParams]);
+  }, [deviceFilter, actionFilter, statusFilter, searchTerm, pageSize, currentPage, setSearchParams]);
 
-  // Filter data based on search term, device, and status
+  // Filter data based on search term, device, action, and status
   const filteredData = useMemo(() => {
     return mockData.filter((item) => {
       const matchDevice = deviceFilter === 'ALL' || item.name === deviceFilter;
+      const matchAction = actionFilter === 'ALL' || item.action === actionFilter;
       const matchStatus = statusFilter === 'ALL' || item.status === statusFilter;
       const matchSearch = matchesTimeSearch(item.time, searchTerm);
 
-      return matchDevice && matchStatus && matchSearch;
+      return matchDevice && matchAction && matchStatus && matchSearch;
     });
-  }, [searchTerm, deviceFilter, statusFilter]);
+  }, [searchTerm, deviceFilter, actionFilter, statusFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filteredData.length / pageSize));
   const currentData = useMemo(() => {
@@ -151,9 +158,11 @@ export default function History() {
   const resetFilters = () => {
     setSearchTerm('');
     setDeviceFilter('ALL');
+    setActionFilter('ALL');
     setStatusFilter('ALL');
     setCurrentPage(1);
     sessionStorage.removeItem('history_device');
+    sessionStorage.removeItem('history_action');
     sessionStorage.removeItem('history_status');
     sessionStorage.removeItem('history_time');
     sessionStorage.removeItem('history_size');
@@ -197,6 +206,23 @@ export default function History() {
               <option value="LED 1">LED 1</option>
               <option value="LED 2">LED 2</option>
               <option value="LED 3">LED 3</option>
+            </select>
+          </div>
+
+          {/* Action Filter */}
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-sm font-medium text-gray-600 whitespace-nowrap">Hành động:</span>
+            <select
+              className="bg-gray-50/80 border border-gray-200 rounded-xl px-3 py-2 text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-[#2a1b4d]/20 focus:border-[#2a1b4d] transition-all"
+              value={actionFilter}
+              onChange={(e) => {
+                setActionFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+            >
+              <option value="ALL">Tất cả</option>
+              <option value="Bật">Bật</option>
+              <option value="Tắt">Tắt</option>
             </select>
           </div>
 

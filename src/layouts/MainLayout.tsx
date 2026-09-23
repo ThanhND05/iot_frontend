@@ -1,6 +1,7 @@
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Database, Clock, User, Hexagon, ChevronLeft, ChevronRight } from 'lucide-react';
+import { LayoutDashboard, Database, Clock, User, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import logoImg from '../assets/logo.png';
 
 const MENU_ITEMS = [
   { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -33,39 +34,33 @@ export default function MainLayout() {
     <div className="flex h-screen w-screen bg-[#F3F4F6] text-gray-800 font-sans overflow-hidden">
       {/* Sidebar */}
       <aside
-        className={`${
-          isCollapsed ? 'w-20' : 'w-64'
-        } bg-gradient-to-b from-[#2a1b4d] to-[#1e1438] text-white flex flex-col shadow-xl z-10 transition-all duration-300 ease-in-out shrink-0`}
+        className={`${isCollapsed ? 'w-20' : 'w-64'
+          } bg-gradient-to-b from-[#2a1b4d] to-[#1e1438] text-white flex flex-col shadow-xl z-20 transition-all duration-300 ease-in-out shrink-0 relative`}
       >
-        {/* Sidebar Header with attached < > toggle button */}
-        <div
-          className={`h-20 flex items-center border-b border-white/10 px-4 transition-all duration-300 ${
-            isCollapsed ? 'justify-center' : 'justify-between px-5'
-          }`}
+        {/* Floating Toggle Button ở viền bên phải */}
+        <button
+          onClick={() => setIsCollapsed(!isCollapsed)}
+          className="absolute -right-3.5 top-[26px] w-7 h-7 bg-white text-[#2a1b4d] rounded-full shadow-md border border-gray-200 flex items-center justify-center cursor-pointer hover:bg-gray-100 hover:scale-110 active:scale-95 transition-all duration-200 z-30"
+          title={isCollapsed ? 'Mở rộng menu' : 'Thu gọn menu'}
         >
-          {!isCollapsed ? (
-            <>
-              <div className="flex items-center gap-2 text-2xl font-bold tracking-tight">
-                <span className="text-red-500">Thanh</span>
-                <span>IoT</span>
-                <Hexagon className="w-5 h-5 text-white/50" />
-              </div>
-              <button
-                onClick={() => setIsCollapsed(true)}
-                className="p-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-                title="Thu gọn menu"
-              >
-                <ChevronLeft className="w-5 h-5" />
-              </button>
-            </>
+          {isCollapsed ? (
+            <ChevronRight className="w-4 h-4 stroke-[2.5]" />
           ) : (
-            <button
-              onClick={() => setIsCollapsed(false)}
-              className="p-2.5 rounded-xl text-white/80 hover:text-white hover:bg-white/10 transition-colors flex items-center justify-center cursor-pointer"
-              title="Mở rộng menu"
-            >
-              <ChevronRight className="w-6 h-6" />
-            </button>
+            <ChevronLeft className="w-4 h-4 stroke-[2.5]" />
+          )}
+        </button>
+
+        {/* Sidebar Header */}
+        <div className="h-20 flex items-center justify-center border-b border-white/10 px-4 transition-all duration-300">
+          {!isCollapsed ? (
+            <Link to="/dashboard" className="flex items-center justify-center overflow-hidden hover:opacity-95 transition-opacity">
+              <img src={logoImg} alt="ThanhIoT" className="h-9 w-auto max-w-[185px] object-contain rounded-md" />
+            </Link>
+          ) : (
+            <Link to="/dashboard" className="flex items-center justify-center overflow-hidden hover:opacity-95 transition-opacity" title="ThanhIoT">
+              <span className="text-xl font-black text-red-500 tracking-tighter">T</span>
+              <span className="text-sm font-bold text-white">IoT</span>
+            </Link>
           )}
         </div>
 
@@ -79,13 +74,11 @@ export default function MainLayout() {
                 key={item.path}
                 to={item.path}
                 title={isCollapsed ? item.label : undefined}
-                className={`flex items-center rounded-xl transition-all duration-200 font-medium ${
-                  isCollapsed ? 'justify-center p-3' : 'gap-3 px-4 py-3'
-                } ${
-                  isActive
+                className={`flex items-center rounded-xl transition-all duration-200 font-medium ${isCollapsed ? 'justify-center p-3' : 'gap-3 px-4 py-3'
+                  } ${isActive
                     ? 'bg-gradient-to-r from-white/95 to-white/80 text-[#2a1b4d] shadow-md font-semibold'
                     : 'text-white/70 hover:bg-white/10 hover:text-white'
-                }`}
+                  }`}
               >
                 <Icon className="w-5 h-5 shrink-0" />
                 {!isCollapsed && <span className="truncate">{item.label}</span>}
@@ -100,7 +93,7 @@ export default function MainLayout() {
         {/* Header */}
         <header className="h-20 bg-[#F3F4F6] flex items-center justify-between px-8 z-0 border-b border-gray-200 shrink-0">
           <div>
-            <div className="text-xs sm:text-sm text-gray-500">Chào mừng trở lại,</div>
+            {/* <div className="text-xs sm:text-sm text-gray-500">Chào mừng trở lại,</div> */}
             <h1 className="text-lg sm:text-xl font-bold text-[#2a1b4d] truncate">{getPageTitle()}</h1>
           </div>
           <div className="flex items-center gap-3">
