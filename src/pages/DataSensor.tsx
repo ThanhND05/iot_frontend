@@ -1,7 +1,6 @@
 import { Search, RotateCcw, Loader2 } from 'lucide-react';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef, startTransition } from 'react';
 import { useSearchParams } from 'react-router-dom';
-
 import { sensorApi } from '../api/sensorApi';
 import type { DataSensorItem } from '../api/types';
 
@@ -30,9 +29,7 @@ export default function DataSensor() {
     const raw =
       searchParams.get('size') ||
       sessionStorage.getItem('datasensor_size');
-
     const parsed = raw ? Number(raw) : 10;
-
     return Number.isFinite(parsed) && parsed > 0
       ? Math.min(parsed, MAX_PAGE_SIZE)
       : 10;
@@ -42,9 +39,7 @@ export default function DataSensor() {
     const raw =
       searchParams.get('page') ||
       sessionStorage.getItem('datasensor_page');
-
     const parsed = raw ? Number(raw) : 1;
-
     return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
   });
 
@@ -53,48 +48,40 @@ export default function DataSensor() {
   const [totalElements, setTotalElements] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
 
+  // Chỉ nhận kết quả của request mới nhất, tránh response cũ ghi đè response mới.
+  const requestIdRef = useRef(0);
+  const loadingTimerRef = useRef<number | null>(null);
+
   // Tránh gọi API sau mỗi phím bấm.
-  const [debouncedSearchTerm, setDebouncedSearchTerm] =
-    useState(searchTerm);
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(searchTerm);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
       setDebouncedSearchTerm(searchTerm.trim());
-    }, 350);
+    }, 220);
 
     return () => window.clearTimeout(timer);
   }, [searchTerm]);
 
-  const validPageSize =
-    pageSize > 0 ? Math.min(pageSize, MAX_PAGE_SIZE) : 10;
+  const validPageSize = pageSize > 0 ? Math.min(pageSize, MAX_PAGE_SIZE) : 10;
 
   // Đồng bộ trạng thái filter vào URL + sessionStorage.
   useEffect(() => {
     sessionStorage.setItem('datasensor_type', sensorFilter);
     sessionStorage.setItem('datasensor_search', searchTerm);
-    sessionStorage.setItem(
-      'datasensor_size',
-      String(validPageSize),
-    );
-    sessionStorage.setItem(
-      'datasensor_page',
-      String(currentPage),
-    );
+    sessionStorage.setItem('datasensor_size', String(validPageSize));
+    sessionStorage.setItem('datasensor_page', String(currentPage));
 
     const params: Record<string, string> = {};
-
     if (sensorFilter !== 'ALL') {
       params.type = sensorFilter;
     }
-
-    if (searchTerm.trim()) {
-      params.search = searchTerm.trim();
+    if (debouncedSearchTerm) {
+      params.search = debouncedSearchTerm;
     }
-
     if (currentPage > 1) {
       params.page = String(currentPage);
     }
-
     if (validPageSize !== 10) {
       params.size = String(validPageSize);
     }
@@ -102,7 +89,7 @@ export default function DataSensor() {
     setSearchParams(params, { replace: true });
   }, [
     sensorFilter,
-    searchTerm,
+    debouncedSearchTerm,
     validPageSize,
     currentPage,
     setSearchParams,
@@ -125,13 +112,10 @@ export default function DataSensor() {
 
   const formatDateTime = (isoString?: string | null) => {
     if (!isoString) return '';
-
     const date = new Date(isoString);
-
     if (Number.isNaN(date.getTime())) {
       return isoString;
     }
-
     return date.toLocaleString('vi-VN', {
       day: '2-digit',
       month: '2-digit',
@@ -146,33 +130,35 @@ export default function DataSensor() {
     if (type === 'temperature') return 'Nhiệt độ';
     if (type === 'humidity') return 'Độ ẩm';
     if (type === 'light') return 'Ánh sáng';
-
     return type;
   };
 
-  const getSensorDisplayValue = (
-    type: string,
-    value: string,
-  ) => {
+  const getSensorDisplayValue = (type: string, value: string) => {
     if (type === 'temperature') {
       return value.includes('°C') ? value : `${value}°C`;
     }
-
     if (type === 'humidity') {
       return value.includes('%') ? value : `${value}%`;
     }
-
     if (type === 'light') {
-      return value.includes('Lux')
-        ? value
-        : `${value} Lux`;
+      return value.includes('Lux') ? value : `${value} Lux`;
     }
-
     return value;
   };
 
   const fetchData = useCallback(async () => {
-    setIsLoading(true);
+    const requestId = ++requestIdRef.current;
+
+    if (loadingTimerRef.current !== null) {
+      window.clearTimeout(loadingTimerRef.current);
+    }
+
+    // Request nhanh dưới 150ms sẽ không hiện spinner -> tránh nháy UI.
+    loadingTimerRef.current = window.setTimeout(() => {
+      if (requestId === requestIdRef.current) {
+        setIsLoading(true);
+      }
+    }, 150);
 
     try {
       const res = await sensorApi.search({
@@ -180,49 +166,52 @@ export default function DataSensor() {
         size: validPageSize,
         type: mapSensorTypeToBackend(sensorFilter),
         search: debouncedSearchTerm || undefined,
-        searchMode:
-          sensorFilter === 'Thời gian'
-            ? 'TIME'
-            : 'ALL',
+        searchMode: sensorFilter === 'Thời gian' ? 'TIME' : 'ALL',
       });
 
-      if (res.success && res.data) {
-        const nextTotalPages = Math.max(
-          1,
-          res.data.totalPages || 1,
-        );
+      // Nếu đã có request mới hơn thì bỏ kết quả cũ.
+      if (requestId !== requestIdRef.current) return;
 
-        setSensorData(res.data.content || []);
-        setTotalPages(nextTotalPages);
-        setTotalElements(res.data.totalElements || 0);
+      if (res.success && res.data) {
+        const nextTotalPages = Math.max(1, res.data.totalPages || 1);
+
+        startTransition(() => {
+          setSensorData(res.data.content || []);
+          setTotalPages(nextTotalPages);
+          setTotalElements(res.data.totalElements || 0);
+        });
 
         if (currentPage > nextTotalPages) {
           setCurrentPage(nextTotalPages);
         }
-      } else {
-        // Keep stale data — don't clear while loading
-        setTotalPages(1);
-        setTotalElements(0);
       }
     } catch (err) {
-      console.log(
-        'Notice: Chưa thể kết nối Backend hoặc chưa có dữ liệu:',
-        err,
-      );
-      // Keep stale data on error
+      if (requestId === requestIdRef.current) {
+        console.log('Notice: Chưa thể kết nối Backend hoặc chưa có dữ liệu:', err);
+      }
+      // Giữ nguyên dữ liệu đang hiển thị nếu request lỗi.
     } finally {
-      setIsLoading(false);
+      if (requestId === requestIdRef.current) {
+        if (loadingTimerRef.current !== null) {
+          window.clearTimeout(loadingTimerRef.current);
+          loadingTimerRef.current = null;
+        }
+        setIsLoading(false);
+      }
     }
-  }, [
-    currentPage,
-    validPageSize,
-    sensorFilter,
-    debouncedSearchTerm,
-  ]);
+  }, [currentPage, validPageSize, sensorFilter, debouncedSearchTerm]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  useEffect(() => {
+    return () => {
+      if (loadingTimerRef.current !== null) {
+        window.clearTimeout(loadingTimerRef.current);
+      }
+    };
+  }, []);
 
   const resetFilters = () => {
     setSearchTerm('');
@@ -243,11 +232,9 @@ export default function DataSensor() {
     if (sensorFilter === 'Thời gian') {
       return 'Tìm kiếm theo thời gian...';
     }
-
     if (sensorFilter === 'ALL') {
       return 'Tìm kiếm theo giá trị hoặc thời gian...';
     }
-
     return `Tìm kiếm ${sensorFilter.toLowerCase()} theo giá trị hoặc thời gian...`;
   };
 
@@ -257,7 +244,6 @@ export default function DataSensor() {
       <div className="px-5 py-2.5 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-3 shrink-0">
         <div className="relative flex-1 max-w-sm lg:max-w-md min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-
           <input
             type="text"
             placeholder={getSearchPlaceholder()}
@@ -275,7 +261,6 @@ export default function DataSensor() {
             <span className="text-xs font-medium text-gray-600 whitespace-nowrap">
               Loại cảm biến:
             </span>
-
             <select
               className="bg-gray-50/80 border border-gray-200 rounded-xl px-2.5 py-1.5 text-xs font-medium text-gray-700 cursor-pointer hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-[#2a1b4d]/20 focus:border-[#2a1b4d] transition-all"
               value={sensorFilter}
@@ -301,10 +286,12 @@ export default function DataSensor() {
             <span>Đặt lại</span>
           </button>
 
-          {/* Inline loading indicator — no overlay, no flash */}
-          {isLoading && (
-            <Loader2 className="w-3.5 h-3.5 text-[#2a1b4d] animate-spin shrink-0" />
-          )}
+          {/* Reserved spinner slot — no layout shift */}
+          <div className="w-3.5 h-3.5 shrink-0">
+            {isLoading && (
+              <Loader2 className="w-3.5 h-3.5 text-[#2a1b4d] animate-spin" />
+            )}
+          </div>
         </div>
       </div>
 
@@ -327,41 +314,34 @@ export default function DataSensor() {
               </th>
             </tr>
           </thead>
-
           <tbody className="text-xs">
             {sensorData.length > 0 ? (
               sensorData.map((row, idx) => (
                 <tr
                   key={row.id}
-                  className={`border-b border-gray-100 hover:bg-purple-50/30 transition-colors ${idx % 2 === 0
-                      ? 'bg-white'
-                      : 'bg-gray-50/40'
-                    }`}
+                  className={`border-b border-gray-100 hover:bg-purple-50/30 transition-colors ${
+                    idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'
+                  }`}
                 >
                   <td className="py-2 px-4 text-gray-600 font-mono">
                     {row.id}
                   </td>
-
                   <td className="py-2 px-4 text-gray-900 font-medium">
                     {getSensorDisplayName(row.sensorType)}
                   </td>
-
                   <td className="py-2 px-4">
                     <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${row.sensorType === 'temperature'
+                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                        row.sensorType === 'temperature'
                           ? 'bg-rose-50 text-rose-700 border border-rose-200'
                           : row.sensorType === 'humidity'
                             ? 'bg-blue-50 text-blue-700 border border-blue-200'
                             : 'bg-amber-50 text-amber-700 border border-amber-200'
-                        }`}
+                      }`}
                     >
-                      {getSensorDisplayValue(
-                        row.sensorType,
-                        row.value,
-                      )}
+                      {getSensorDisplayValue(row.sensorType, row.value)}
                     </span>
                   </td>
-
                   <td className="py-2 px-4 text-gray-500 font-mono">
                     {formatDateTime(row.createdAt)}
                   </td>
@@ -375,24 +355,20 @@ export default function DataSensor() {
                 >
                   <div className="flex flex-col items-center justify-center gap-2">
                     <Search className="w-8 h-8 text-gray-300" />
-
                     <p className="text-sm font-medium text-gray-600">
                       Không tìm thấy dữ liệu cảm biến phù hợp
                     </p>
-
                     <p className="text-xs text-gray-400">
                       Hãy thử thay đổi từ khóa hoặc bộ lọc
                     </p>
-
-                    {(searchTerm ||
-                      sensorFilter !== 'ALL') && (
-                        <button
-                          onClick={resetFilters}
-                          className="text-xs text-[#2a1b4d] underline font-medium mt-1 cursor-pointer"
-                        >
-                          Xóa bộ lọc
-                        </button>
-                      )}
+                    {(searchTerm || sensorFilter !== 'ALL') && (
+                      <button
+                        onClick={resetFilters}
+                        className="text-xs text-[#2a1b4d] underline font-medium mt-1 cursor-pointer"
+                      >
+                        Xóa bộ lọc
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -413,8 +389,7 @@ export default function DataSensor() {
           đến{' '}
           <span className="font-semibold text-gray-700">
             {Math.min(
-              (currentPage - 1) * validPageSize +
-              sensorData.length,
+              (currentPage - 1) * validPageSize + sensorData.length,
               totalElements,
             )}
           </span>{' '}
@@ -428,7 +403,6 @@ export default function DataSensor() {
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-1.5">
             <span>Số hàng:</span>
-
             <input
               type="number"
               min={1}
@@ -436,21 +410,13 @@ export default function DataSensor() {
               value={pageSize || ''}
               onChange={(e) => {
                 const raw = e.target.value;
-
                 if (raw === '') {
                   setPageSize(0);
                   return;
                 }
-
                 const parsed = Number.parseInt(raw, 10);
-
-                if (
-                  Number.isFinite(parsed) &&
-                  parsed > 0
-                ) {
-                  setPageSize(
-                    Math.min(parsed, MAX_PAGE_SIZE),
-                  );
+                if (Number.isFinite(parsed) && parsed > 0) {
+                  setPageSize(Math.min(parsed, MAX_PAGE_SIZE));
                   setCurrentPage(1);
                 }
               }}
@@ -470,25 +436,18 @@ export default function DataSensor() {
           <div className="flex gap-1">
             <button
               onClick={() =>
-                setCurrentPage((page) =>
-                  Math.max(1, page - 1),
-                )
+                setCurrentPage((page) => Math.max(1, page - 1))
               }
-              disabled={currentPage <= 1 || isLoading}
+              disabled={currentPage <= 1}
               className="p-1 px-2 rounded-lg border border-gray-200 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-xs cursor-pointer"
             >
               &lt;
             </button>
-
             <button
               onClick={() =>
-                setCurrentPage((page) =>
-                  Math.min(totalPages, page + 1),
-                )
+                setCurrentPage((page) => Math.min(totalPages, page + 1))
               }
-              disabled={
-                currentPage >= totalPages || isLoading
-              }
+              disabled={currentPage >= totalPages}
               className="p-1 px-2 rounded-lg border border-gray-200 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-xs cursor-pointer"
             >
               &gt;

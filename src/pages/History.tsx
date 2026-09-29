@@ -6,9 +6,8 @@ import {
   Clock,
   Loader2,
 } from 'lucide-react';
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, startTransition } from 'react';
 import { useSearchParams } from 'react-router-dom';
-
 import { actionApi } from '../api/actionApi';
 import type { ActionResponse } from '../api/types';
 import { webSocketService } from '../services/websocketService';
@@ -54,9 +53,7 @@ export default function History() {
     const raw =
       searchParams.get('size') ||
       sessionStorage.getItem('history_size');
-
     const parsed = raw ? Number(raw) : 10;
-
     return Number.isFinite(parsed) && parsed > 0
       ? Math.min(parsed, MAX_PAGE_SIZE)
       : 10;
@@ -66,12 +63,8 @@ export default function History() {
     const raw =
       searchParams.get('page') ||
       sessionStorage.getItem('history_page');
-
     const parsed = raw ? Number(raw) : 1;
-
-    return Number.isFinite(parsed) && parsed > 0
-      ? parsed
-      : 1;
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
   });
 
   const [actions, setActions] = useState<ActionResponse[]>([]);
@@ -79,56 +72,46 @@ export default function History() {
   const [totalElements, setTotalElements] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
 
-  const [debouncedSearchTerm, setDebouncedSearchTerm] =
-    useState(searchTerm);
+  // Bỏ qua response cũ khi người dùng đổi filter liên tục.
+  const requestIdRef = useRef(0);
+  const loadingTimerRef = useRef<number | null>(null);
+
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(searchTerm);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
       setDebouncedSearchTerm(searchTerm.trim());
-    }, 350);
+    }, 220);
 
     return () => window.clearTimeout(timer);
   }, [searchTerm]);
 
-  const validPageSize =
-    pageSize > 0 ? Math.min(pageSize, MAX_PAGE_SIZE) : 10;
+  const validPageSize = pageSize > 0 ? Math.min(pageSize, MAX_PAGE_SIZE) : 10;
 
   useEffect(() => {
     sessionStorage.setItem('history_device', deviceFilter);
     sessionStorage.setItem('history_action', actionFilter);
     sessionStorage.setItem('history_status', statusFilter);
     sessionStorage.setItem('history_time', searchTerm);
-    sessionStorage.setItem(
-      'history_size',
-      String(validPageSize),
-    );
-    sessionStorage.setItem(
-      'history_page',
-      String(currentPage),
-    );
+    sessionStorage.setItem('history_size', String(validPageSize));
+    sessionStorage.setItem('history_page', String(currentPage));
 
     const params: Record<string, string> = {};
-
     if (deviceFilter !== 'ALL') {
       params.device = deviceFilter;
     }
-
     if (actionFilter !== 'ALL') {
       params.action = actionFilter;
     }
-
     if (statusFilter !== 'ALL') {
       params.status = statusFilter;
     }
-
-    if (searchTerm.trim()) {
-      params.time = searchTerm.trim();
+    if (debouncedSearchTerm) {
+      params.time = debouncedSearchTerm;
     }
-
     if (currentPage > 1) {
       params.page = String(currentPage);
     }
-
     if (validPageSize !== 10) {
       params.size = String(validPageSize);
     }
@@ -138,7 +121,7 @@ export default function History() {
     deviceFilter,
     actionFilter,
     statusFilter,
-    searchTerm,
+    debouncedSearchTerm,
     validPageSize,
     currentPage,
     setSearchParams,
@@ -149,7 +132,6 @@ export default function History() {
   ): 'ON' | 'OFF' | undefined => {
     if (value === 'Bật') return 'ON';
     if (value === 'Tắt') return 'OFF';
-
     return undefined;
   };
 
@@ -159,14 +141,12 @@ export default function History() {
     if (value === 'Thành công') return 'SUCCESS';
     if (value === 'Thất bại') return 'FAILED';
     if (value === 'Đang chờ') return 'PENDING';
-
     return undefined;
   };
 
   const mapActionDisplay = (action: string) => {
     if (action === 'ON') return 'Bật';
     if (action === 'OFF') return 'Tắt';
-
     return action;
   };
 
@@ -174,19 +154,15 @@ export default function History() {
     if (status === 'SUCCESS') return 'Thành công';
     if (status === 'FAILED') return 'Thất bại';
     if (status === 'PENDING') return 'Đang chờ';
-
     return status;
   };
 
   const formatDateTime = (isoString?: string | null) => {
     if (!isoString) return '';
-
     const date = new Date(isoString);
-
     if (Number.isNaN(date.getTime())) {
       return isoString;
     }
-
     return date.toLocaleString('vi-VN', {
       day: '2-digit',
       month: '2-digit',
@@ -198,47 +174,60 @@ export default function History() {
   };
 
   const fetchData = useCallback(async () => {
-    setIsLoading(true);
+    const requestId = ++requestIdRef.current;
+
+    if (loadingTimerRef.current !== null) {
+      window.clearTimeout(loadingTimerRef.current);
+    }
+
+    // Chỉ hiện loading khi request đủ chậm để người dùng thực sự cần thấy nó.
+    loadingTimerRef.current = window.setTimeout(() => {
+      if (requestId === requestIdRef.current) {
+        setIsLoading(true);
+      }
+    }, 150);
 
     try {
       const res = await actionApi.searchActions({
         page: currentPage - 1,
         size: validPageSize,
-        device:
-          deviceFilter === 'ALL'
-            ? undefined
-            : deviceFilter,
+        device: deviceFilter === 'ALL' ? undefined : deviceFilter,
         action: mapActionToBackend(actionFilter),
         status: mapStatusToBackend(statusFilter),
         time: debouncedSearchTerm || undefined,
       });
 
-      if (res.success && res.data) {
-        const nextTotalPages = Math.max(
-          1,
-          res.data.totalPages || 1,
-        );
+      if (requestId !== requestIdRef.current) return;
 
-        setActions(res.data.content || []);
-        setTotalPages(nextTotalPages);
-        setTotalElements(res.data.totalElements || 0);
+      if (res.success && res.data) {
+        const nextTotalPages = Math.max(1, res.data.totalPages || 1);
+
+        startTransition(() => {
+          setActions(res.data.content || []);
+          setTotalPages(nextTotalPages);
+          setTotalElements(res.data.totalElements || 0);
+        });
 
         if (currentPage > nextTotalPages) {
           setCurrentPage(nextTotalPages);
         }
-      } else {
-        // Keep stale data — don't clear while loading
-        setTotalPages(1);
-        setTotalElements(0);
       }
     } catch (err) {
-      console.log(
-        'Notice: Chưa thể kết nối Backend hoặc chưa có dữ liệu hành động:',
-        err,
-      );
-      // Keep stale data on error
+      if (requestId === requestIdRef.current) {
+        console.log(
+          'Notice: Chưa thể kết nối Backend hoặc chưa có dữ liệu hành động:',
+          err,
+        );
+      }
+      // Giữ nguyên bảng hiện tại nếu request lỗi.
     } finally {
-      setIsLoading(false);
+      if (requestId === requestIdRef.current) {
+        if (loadingTimerRef.current !== null) {
+          window.clearTimeout(loadingTimerRef.current);
+          loadingTimerRef.current = null;
+        }
+        setIsLoading(false);
+      }
     }
   }, [
     currentPage,
@@ -253,8 +242,17 @@ export default function History() {
     fetchData();
   }, [fetchData]);
 
+  useEffect(() => {
+    return () => {
+      if (loadingTimerRef.current !== null) {
+        window.clearTimeout(loadingTimerRef.current);
+      }
+    };
+  }, []);
+
   // Keep a stable ref to fetchData so WebSocket callbacks always use the latest version.
   const fetchDataRef = useRef(fetchData);
+
   useEffect(() => {
     fetchDataRef.current = fetchData;
   }, [fetchData]);
@@ -268,6 +266,7 @@ export default function History() {
         setTimeout(() => fetchDataRef.current(), 500);
       }),
     );
+
     return () => unsubscribes.forEach((fn) => fn());
   }, []);
 
@@ -296,7 +295,6 @@ export default function History() {
       <div className="px-5 py-2.5 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-3 shrink-0">
         <div className="relative flex-1 max-w-sm lg:max-w-md min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-
           <input
             type="text"
             placeholder="Tìm kiếm theo thời gian..."
@@ -315,7 +313,6 @@ export default function History() {
             <span className="text-xs font-medium text-gray-600 whitespace-nowrap">
               Tên thiết bị:
             </span>
-
             <select
               className="bg-gray-50/80 border border-gray-200 rounded-xl px-2.5 py-1.5 text-xs font-medium text-gray-700 cursor-pointer hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-[#2a1b4d]/20 focus:border-[#2a1b4d] transition-all"
               value={deviceFilter}
@@ -336,7 +333,6 @@ export default function History() {
             <span className="text-xs font-medium text-gray-600 whitespace-nowrap">
               Hành động:
             </span>
-
             <select
               className="bg-gray-50/80 border border-gray-200 rounded-xl px-2.5 py-1.5 text-xs font-medium text-gray-700 cursor-pointer hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-[#2a1b4d]/20 focus:border-[#2a1b4d] transition-all"
               value={actionFilter}
@@ -356,7 +352,6 @@ export default function History() {
             <span className="text-xs font-medium text-gray-600 whitespace-nowrap">
               Trạng thái:
             </span>
-
             <select
               className="bg-gray-50/80 border border-gray-200 rounded-xl px-2.5 py-1.5 text-xs font-medium text-gray-700 cursor-pointer hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-[#2a1b4d]/20 focus:border-[#2a1b4d] transition-all"
               value={statusFilter}
@@ -381,10 +376,12 @@ export default function History() {
             <span>Đặt lại</span>
           </button>
 
-          {/* Inline loading indicator — no overlay, no flash */}
-          {isLoading && (
-            <Loader2 className="w-3.5 h-3.5 text-[#2a1b4d] animate-spin shrink-0" />
-          )}
+          {/* Reserved spinner slot — no layout shift */}
+          <div className="w-3.5 h-3.5 shrink-0">
+            {isLoading && (
+              <Loader2 className="w-3.5 h-3.5 text-[#2a1b4d] animate-spin" />
+            )}
+          </div>
         </div>
       </div>
 
@@ -413,73 +410,61 @@ export default function History() {
               </th>
             </tr>
           </thead>
-
           <tbody className="text-xs">
             {actions.length > 0 ? (
               actions.map((row, idx) => {
-                const actionLabel =
-                  mapActionDisplay(row.action);
-
-                const statusLabel =
-                  mapStatusDisplay(row.status);
+                const actionLabel = mapActionDisplay(row.action);
+                const statusLabel = mapStatusDisplay(row.status);
 
                 return (
                   <tr
                     key={row.id}
-                    className={`border-b border-gray-100 hover:bg-purple-50/30 transition-colors ${idx % 2 === 0
-                        ? 'bg-white'
-                        : 'bg-gray-50/40'
-                      }`}
+                    className={`border-b border-gray-100 hover:bg-purple-50/30 transition-colors ${
+                      idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'
+                    }`}
                   >
                     <td className="py-2 px-4 text-gray-600 font-mono">
                       {row.id}
                     </td>
-
                     <td className="py-2 px-4 text-gray-800 font-medium">
                       Nguyễn Duy Thanh
                     </td>
-
                     <td className="py-2 px-4 text-gray-900 font-medium">
-                      {row.deviceName ||
-                        `LED ${row.deviceId}`}
+                      {row.deviceName || `LED ${row.deviceId}`}
                     </td>
-
                     <td className="py-2 px-4">
                       <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold ${actionLabel === 'Bật'
+                        className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold ${
+                          actionLabel === 'Bật'
                             ? 'bg-blue-50 text-blue-700 border border-blue-200'
                             : 'bg-gray-100 text-gray-600 border border-gray-200'
-                          }`}
+                        }`}
                       >
                         {actionLabel}
                       </span>
                     </td>
-
                     <td className="py-2 px-4">
                       <span
-                        className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ${statusLabel === 'Thành công'
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                          statusLabel === 'Thành công'
                             ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                             : statusLabel === 'Thất bại'
                               ? 'bg-rose-50 text-rose-700 border border-rose-200'
                               : 'bg-amber-50 text-amber-700 border border-amber-200'
-                          }`}
+                        }`}
                       >
                         {statusLabel === 'Thành công' && (
                           <CheckCircle2 className="w-3.5 h-3.5" />
                         )}
-
                         {statusLabel === 'Thất bại' && (
                           <XCircle className="w-3.5 h-3.5" />
                         )}
-
                         {statusLabel === 'Đang chờ' && (
                           <Clock className="w-3.5 h-3.5" />
                         )}
-
                         {statusLabel}
                       </span>
                     </td>
-
                     <td className="py-2 px-4 text-gray-500 font-mono">
                       {formatDateTime(row.createdAt)}
                     </td>
@@ -494,22 +479,20 @@ export default function History() {
                 >
                   <div className="flex flex-col items-center justify-center gap-2">
                     <Search className="w-8 h-8 text-gray-300" />
-
                     <p className="text-sm font-medium">
                       Không tìm thấy dữ liệu phù hợp
                     </p>
-
                     {(searchTerm ||
                       deviceFilter !== 'ALL' ||
                       actionFilter !== 'ALL' ||
                       statusFilter !== 'ALL') && (
-                        <button
-                          onClick={resetFilters}
-                          className="text-xs text-[#2a1b4d] underline font-medium mt-1 cursor-pointer"
-                        >
-                          Xóa bộ lọc
-                        </button>
-                      )}
+                      <button
+                        onClick={resetFilters}
+                        className="text-xs text-[#2a1b4d] underline font-medium mt-1 cursor-pointer"
+                      >
+                        Xóa bộ lọc
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -530,8 +513,7 @@ export default function History() {
           đến{' '}
           <span className="font-semibold text-gray-700">
             {Math.min(
-              (currentPage - 1) * validPageSize +
-              actions.length,
+              (currentPage - 1) * validPageSize + actions.length,
               totalElements,
             )}
           </span>{' '}
@@ -545,7 +527,6 @@ export default function History() {
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-1.5">
             <span>Số hàng:</span>
-
             <input
               type="number"
               min={1}
@@ -553,25 +534,13 @@ export default function History() {
               value={pageSize || ''}
               onChange={(e) => {
                 const raw = e.target.value;
-
                 if (raw === '') {
                   setPageSize(0);
                   return;
                 }
-
-                const parsed =
-                  Number.parseInt(raw, 10);
-
-                if (
-                  Number.isFinite(parsed) &&
-                  parsed > 0
-                ) {
-                  setPageSize(
-                    Math.min(
-                      parsed,
-                      MAX_PAGE_SIZE,
-                    ),
-                  );
+                const parsed = Number.parseInt(raw, 10);
+                if (Number.isFinite(parsed) && parsed > 0) {
+                  setPageSize(Math.min(parsed, MAX_PAGE_SIZE));
                   setCurrentPage(1);
                 }
               }}
@@ -591,31 +560,20 @@ export default function History() {
           <div className="flex gap-1">
             <button
               onClick={() =>
-                setCurrentPage((page) =>
-                  Math.max(1, page - 1),
-                )
+                setCurrentPage((page) => Math.max(1, page - 1))
               }
-              disabled={
-                currentPage <= 1 || isLoading
-              }
+              disabled={currentPage <= 1}
               className="p-1 px-2 rounded-lg border border-gray-200 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-xs cursor-pointer"
             >
               &lt;
             </button>
-
             <button
               onClick={() =>
                 setCurrentPage((page) =>
-                  Math.min(
-                    totalPages,
-                    page + 1,
-                  ),
+                  Math.min(totalPages, page + 1),
                 )
               }
-              disabled={
-                currentPage >= totalPages ||
-                isLoading
-              }
+              disabled={currentPage >= totalPages}
               className="p-1 px-2 rounded-lg border border-gray-200 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-xs cursor-pointer"
             >
               &gt;
