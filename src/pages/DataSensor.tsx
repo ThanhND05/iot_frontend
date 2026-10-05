@@ -161,12 +161,14 @@ export default function DataSensor() {
     }, 150);
 
     try {
+      const isTimeMode = sensorFilter === 'Thời gian';
       const res = await sensorApi.search({
         page: currentPage - 1,
         size: validPageSize,
         type: mapSensorTypeToBackend(sensorFilter),
-        search: debouncedSearchTerm || undefined,
-        searchMode: sensorFilter === 'Thời gian' ? 'TIME' : 'ALL',
+        search: isTimeMode ? undefined : (debouncedSearchTerm || undefined),
+        time: isTimeMode ? (debouncedSearchTerm || undefined) : undefined,
+        searchMode: isTimeMode ? 'TIME' : 'ALL',
       });
 
       // Nếu đã có request mới hơn thì bỏ kết quả cũ.

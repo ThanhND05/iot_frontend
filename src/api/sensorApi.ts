@@ -18,6 +18,7 @@ export interface SearchSensorParams {
     size?: number;
     type?: string;
     search?: string;
+    time?: string;
     searchMode?: 'ALL' | 'TIME';
 }
 
