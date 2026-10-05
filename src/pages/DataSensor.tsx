@@ -126,24 +126,51 @@ export default function DataSensor() {
     });
   };
 
+  const normalizeSensorType = (type?: string | null): 'temperature' | 'humidity' | 'light' | 'unknown' => {
+    if (!type) return 'unknown';
+    const lower = type.toLowerCase().trim();
+    if (lower === 'temperature' || lower.includes('temp') || lower.includes('nhiệt')) return 'temperature';
+    if (lower === 'humidity' || lower.includes('humid') || lower.includes('ẩm')) return 'humidity';
+    if (lower === 'light' || lower.includes('sáng')) return 'light';
+    return 'unknown';
+  };
+
   const getSensorDisplayName = (type: string) => {
-    if (type === 'temperature') return 'Nhiệt độ';
-    if (type === 'humidity') return 'Độ ẩm';
-    if (type === 'light') return 'Ánh sáng';
+    const normalized = normalizeSensorType(type);
+    if (normalized === 'temperature') return 'Nhiệt độ';
+    if (normalized === 'humidity') return 'Độ ẩm';
+    if (normalized === 'light') return 'Ánh sáng';
     return type;
   };
 
+  const getSensorBadgeClass = (type: string) => {
+    const normalized = normalizeSensorType(type);
+    switch (normalized) {
+      case 'temperature':
+        return 'bg-red-50 text-red-600 border border-red-200';
+      case 'humidity':
+        return 'bg-blue-50 text-blue-600 border border-blue-200';
+      case 'light':
+        return 'bg-amber-50 text-amber-600 border border-amber-200';
+      default:
+        return 'bg-gray-50 text-gray-700 border border-gray-200';
+    }
+  };
+
   const getSensorDisplayValue = (type: string, value: string) => {
-    if (type === 'temperature') {
-      return value.includes('°C') ? value : `${value}°C`;
+    if (value === null || value === undefined) return '';
+    const cleanValue = String(value).trim();
+    const normalized = normalizeSensorType(type);
+    if (normalized === 'temperature') {
+      return cleanValue.includes('°C') || cleanValue.includes('*C') ? cleanValue : `${cleanValue} °C`;
     }
-    if (type === 'humidity') {
-      return value.includes('%') ? value : `${value}%`;
+    if (normalized === 'humidity') {
+      return cleanValue.includes('%') ? cleanValue : `${cleanValue} %`;
     }
-    if (type === 'light') {
-      return value.includes('Lux') ? value : `${value} Lux`;
+    if (normalized === 'light') {
+      return cleanValue.toLowerCase().includes('lux') ? cleanValue : `${cleanValue} Lux`;
     }
-    return value;
+    return cleanValue;
   };
 
   const fetchData = useCallback(async () => {
@@ -333,13 +360,9 @@ export default function DataSensor() {
                   </td>
                   <td className="py-2 px-4">
                     <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                        row.sensorType === 'temperature'
-                          ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                          : row.sensorType === 'humidity'
-                            ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                            : 'bg-amber-50 text-amber-700 border border-amber-200'
-                      }`}
+                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${getSensorBadgeClass(
+                        row.sensorType,
+                      )}`}
                     >
                       {getSensorDisplayValue(row.sensorType, row.value)}
                     </span>

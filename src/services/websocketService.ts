@@ -134,6 +134,13 @@ class WebSocketService {
             }
         };
     }
+    public getSensorConnected(): boolean {
+        return this.isSensorConnected;
+    }
+
+    public getDeviceConnected(): boolean {
+        return this.isDeviceConnected;
+    }
 }
 
 export const webSocketService = new WebSocketService();
