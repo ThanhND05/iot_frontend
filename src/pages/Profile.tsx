@@ -116,7 +116,7 @@ export default function Profile() {
       <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 h-full">
         {/* Github */}
         <a
-          href="https://github.com/ThanhND05/iot_frontend"
+          href="https://github.com/ThanhND05/iot_backend"
           className="bg-white p-5 xl:p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all group flex flex-col justify-between h-full"
           target="_blank"
           rel="noopener noreferrer"
@@ -156,7 +156,9 @@ export default function Profile() {
 
         {/* Postman */}
         <a
-          href="#"
+          href="https://documenter.getpostman.com/view/48345891/2sBYHNY4Dd"
+          target="_blank"
+          rel="noopener noreferrer"
           className="bg-white p-5 xl:p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all group flex flex-col justify-between h-full"
         >
           <div>
@@ -176,7 +178,10 @@ export default function Profile() {
 
         {/* Report */}
         <a
-          href="#"
+          href="/bao_cao_iot.pdf"
+          download="bao_cao_iot.pdf"
+          target="_blank"
+          rel="noopener noreferrer"
           className="bg-white p-5 xl:p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all group flex flex-col justify-between h-full"
         >
           <div>
@@ -184,10 +189,10 @@ export default function Profile() {
               <BookOpen className="w-10 h-10 xl:w-12 xl:h-12 text-red-500 shrink-0 group-hover:scale-105 transition-transform" />
               <h3 className="text-2xl xl:text-3xl font-bold text-gray-800">Báo cáo</h3>
             </div>
-            <p className="text-sm xl:text-base text-gray-600 ml-0.5">Tài liệu báo cáo bài tập lớn</p>
+            <p className="text-sm xl:text-base text-gray-600 ml-0.5">Tài liệu báo cáo bài tập lớn (PDF)</p>
           </div>
           <div className="flex items-center gap-2 text-sm xl:text-base text-blue-600 font-semibold group-hover:underline mt-4">
-            <span>Mở liên kết</span>
+            <span>Tải báo cáo</span>
             <ExternalLink className="w-4 h-4 xl:w-4.5 xl:h-4.5" />
           </div>
         </a>
