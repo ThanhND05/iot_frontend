@@ -178,8 +178,8 @@ export default function Profile() {
 
         {/* Report */}
         <a
-          href="/bao_cao_iot.pdf"
-          download="bao_cao_iot.pdf"
+          href="/iot_report.pdf"
+          download="iot_report.pdf"
           target="_blank"
           rel="noopener noreferrer"
           className="bg-white p-5 xl:p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all group flex flex-col justify-between h-full"
